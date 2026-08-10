@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Put It Back — prototype</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#171a1c;overflow:hidden;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+    font-family:"Arial Black",Impact,sans-serif;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  canvas{display:block;touch-action:none;box-shadow:0 0 60px rgba(0,0,0,.6);border-radius:6px;}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c"></canvas></div>
+<script>
+"use strict";
+
+/* ============================================================
+   PUT IT BACK — WarioWare-style micro-game prototype
+   Logical canvas = 2501 x 5001 (asset space, 1:2 portrait phone)
+   ============================================================ */
+
+const W = 2501, H = 5001;
+const ROUND_TIME = 3000;      // ms per micro-game
+const WIN_TIME   = 1100;      // ms of "GREAT!"
+const LOSE_TIME  = 500;       // ms of dead air on timeout
+
+const cv  = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let viewScale = 1;
+
+/* ---------- palette lifted from the art ---------- */
+const CREAM  = '#EFE9D9';
+const PINK   = '#F26494';
+const YELLOW = '#FFF869';
+const TEAL   = '#68A6AF';
+const INK    = '#2D3446';
+
+/* ---------- asset manifest ---------- */
+const A = {};
+const MANIFEST = {
+  bg13:      'Assets/Background_Level13.png',
+  bg16:      'Assets/Background_Level16.png',
+  bg18:      'Assets/Background_Level18.png',
+  bgSplash:  'Assets/Background_Splash_Screen.png',
+  floor:     'Assets/Floor_Level13.png',
+  floorTop:  'Assets/Floor_Top_Level13.png',
+  window:    'Assets/Window_Level13.png',
+  manhole:   'Assets/Manhole_Level16.png',
+  pill:      'Assets/Pill_Level18.png',
+  picture:   'Assets/Picture_Splash_Screen.png',
+  playBtn:   'Assets/Play_Button_Splash_Screen.png'
+};
+for (let i = 1; i <= 15; i++) MANIFEST['tile' + i] = 'Assets/Tile' + i + '_Level14.png';
+
+let loaded = 0, total = Object.keys(MANIFEST).length, loadFailed = [];
+
+function loadAll(done){
+  for (const key in MANIFEST){
+    const img = new Image();
+    img.onload  = () => { A[key] = img; if (++loaded === total) done(); };
+    img.onerror = () => { loadFailed.push(MANIFEST[key]); if (++loaded === total) done(); };
+    img.src = MANIFEST[key];
+  }
+}
+
+/* ---------- helpers ---------- */
+const rnd    = (a,b) => a + Math.random()*(b-a);
+const rndInt = (a,b) => Math.floor(a + Math.random()*(b-a+1));
+const clamp  = (v,a,b) => v<a?a:(v>b?b:v);
+const lerp   = (a,b,t) => a + (b-a)*t;
+const DEG    = Math.PI/180;
+
+function pickDistinct(n, k){            // k distinct indices out of n
+  const pool = [];
+  for (let i=0;i<n;i++) pool.push(i);
+  for (let i=pool.length-1;i>0;i--){ const j=rndInt(0,i); const t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
+  return pool.slice(0, Math.min(k,n));
+}
+
+function rotateAbout(c, cx, cy, deg){
+  c.translate(cx, cy); c.rotate(deg*DEG); c.translate(-cx, -cy);
+}
+
+/* ============================================================
+   LEVEL 13 — BUILDING / MISALIGNED WINDOWS
+   Floors stack 670px tall, body 1901 wide, top floor has a
+   2013-wide roof cap (57px overhang, 108px tall).
+   Building rests on the hedge line at y = 3346.
+   ============================================================ */
+const BASE_Y   = 3346;
+const BODY_W   = 1901;
+const BODY_X   = 300;          // (2501-1901)/2
+const FH       = 670;          // regular floor height
+const BAND     = 45;           // dark divider strip at top of a floor
+const TOP_H    = 741;          // top-floor asset height
+const TOP_CAP  = 108;          // roof cap height inside that asset
+const TOP_OVER = 57;           // roof overhang each side
+const WIN_W    = 301, WIN_H = 401;
+
+function makeLevel13(){
+  const floors = rndInt(2,5);
+  const buildingH = (floors-1)*FH + TOP_H;
+  const avail = BASE_Y - 300;                       // leave sky margin
+  const s = Math.min(1, avail / buildingH);         // shrink tall buildings to fit
+
+  const topAssetY = BASE_Y - (floors-1)*FH - TOP_H;
+
+  const wins = [];
+  for (let i = 0; i < floors; i++){
+    const isTop = (i === floors-1);
+    let cy;
+    if (isTop) cy = topAssetY + TOP_CAP + (TOP_H-TOP_CAP)/2;
+    else       cy = BASE_Y - (i+1)*FH + BAND + (FH-BAND)/2;
+    for (let sIdx = 0; sIdx < 2; sIdx++){
+      const cx = BODY_X + (sIdx*2 + 1) * (BODY_W/4);
+      wins.push({ cx, cy, dx:0, dy:0, rot:0, tdx:0, tdy:0, trot:0, off:false });
+    }
+  }
+
+  // knock 1..3 windows out of alignment
+  const bad = pickDistinct(wins.length, rndInt(1,3));
+  for (const idx of bad){
+    const w = wins[idx];
+    const mag = rnd(95, 165);
+    const ang = rnd(0, Math.PI*2);
+    w.tdx = w.dx = Math.cos(ang)*mag;
+    w.tdy = w.dy = Math.sin(ang)*mag * 0.75;
+    w.trot = w.rot = rnd(4,9) * (Math.random()<0.5?-1:1);
+    w.off = true;
+  }
+
+  function toLocal(px,py){                          // undo the building scale
+    return [ (px-1250.5)/s + 1250.5, (py-BASE_Y)/s + BASE_Y ];
+  }
+
+  return {
+    prompt: 'ALIGN!',
+    update(dt){
+      for (const w of wins){
+        const t = 1 - Math.pow(0.001, dt/1000);     // frame-rate independent ease
+        w.dx  = lerp(w.dx,  w.tdx,  t);
+        w.dy  = lerp(w.dy,  w.tdy,  t);
+        w.rot = lerp(w.rot, w.trot, t);
+      }
+    },
+    draw(c){
+      c.drawImage(A.bg13, 0, 0, W, H);
+      c.save();
+      c.translate(1250.5, BASE_Y); c.scale(s,s); c.translate(-1250.5, -BASE_Y);
+
+      for (let i = 0; i < floors-1; i++)
+        c.drawImage(A.floor, BODY_X, BASE_Y-(i+1)*FH, BODY_W, FH);
+      c.drawImage(A.floorTop, BODY_X-TOP_OVER, topAssetY, BODY_W+TOP_OVER*2, TOP_H);
+
+      for (const w of wins){
+        c.save();
+        c.translate(w.cx + w.dx, w.cy + w.dy);
+        c.rotate(w.rot*DEG);
+        if (w.off){                                  // soft shadow sells the "loose" panel
+          c.globalAlpha = 0.22; c.fillStyle = '#000';
+          c.fillRect(-WIN_W/2+14, -WIN_H/2+16, WIN_W, WIN_H);
+          c.globalAlpha = 1;
+        }
+        c.drawImage(A.window, -WIN_W/2, -WIN_H/2, WIN_W, WIN_H);
+        c.restore();
+      }
+      c.restore();
+    },
+    tap(px,py){
+      const [x,y] = toLocal(px,py);
+      for (const w of wins){
+        if (!w.off) continue;
+        const dx = x - (w.cx + w.dx);
+        const dy = y - (w.cy + w.dy);
+        if (Math.abs(dx) < WIN_W/2 + 70 && Math.abs(dy) < WIN_H/2 + 70){
+          w.tdx = 0; w.tdy = 0; w.trot = 0; w.off = false;
+          return true;
+        }
+      }
+      return false;
+    },
+    solved(){ return wins.every(w => !w.off); }
+  };
+}
+
+/* ============================================================
+   LEVEL 14 — TRUCHET TILE GRID
+   Each tile carries two quarter-arcs whose ends land on the
+   edge midpoints, so geometry always connects — only COLOUR
+   continuity breaks. A single tile type + this rotation rule
+   produces a fully edge-matched lattice, which makes any wrong
+   rotation unmistakable.
+     k(col,row) = row even ? (col%2) : (3 - col%2)
+   ============================================================ */
+const G14_C = 4, G14_R = 8;
+
+/* Colour pair each tile carries at rotation 0: [colour on the T/L arc,
+   colour on the B/R arc]. Odd tiles put their arcs on the TL+BR diagonal,
+   even tiles on TR+BL — even tiles are the same shape already turned 90. */
+const TILE_PAIR = [null,
+  ['salmon','green'], ['orange','green'],  ['orange','teal'],
+  ['green','pink'],   ['green','red'],     ['teal','red'],
+  ['pink','blue'],    ['red','blue'],      ['red','lgreen'],
+  ['blue','coral'],   ['blue','yellow'],   ['lgreen','yellow'],
+  ['coral','grey'],   ['yellow','grey'],   ['yellow','peri']
+];
+
+// edge colours [T,R,B,L] for tile t at rotation k (k quarter-turns clockwise)
+function tileEdges(t, k){
+  const X = TILE_PAIR[t][0], Y = TILE_PAIR[t][1];
+  const base = (t % 2 === 1) ? [X,Y,Y,X] : [X,X,Y,Y];
+  return [0,1,2,3].map(i => base[(i - k + 4) % 4]);
+}
+
+let ALL_OPTIONS = null;
+function allOptions(){
+  if (ALL_OPTIONS) return ALL_OPTIONS;
+  ALL_OPTIONS = [];
+  for (let t = 1; t <= 15; t++)
+    for (let k = 0; k < 4; k++)
+      ALL_OPTIONS.push({ t, k, e: tileEdges(t,k) });
+  return ALL_OPTIONS;
+}
+
+/* Backtracking search for a grid where every shared edge matches in colour,
+   so the arcs run as continuous multi-colour ribbons. Falls back to the
+   single-tile lattice if the colour graph dead-ends. */
+function solveGrid(){
+  const opts = allOptions();
+  const grid = new Array(G14_C*G14_R).fill(null);
+  let budget = 40000;
+
+  function place(i){
+    if (i === grid.length) return true;
+    if (--budget < 0) return false;
+    const c = i % G14_C, r = (i / G14_C) | 0;
+    const left = c > 0 ? grid[i-1] : null;
+    const up   = r > 0 ? grid[i-G14_C] : null;
+
+    const cand = [];
+    for (const o of opts){
+      if (left && o.e[3] !== left.e[1]) continue;   // my L must equal his R
+      if (up   && o.e[0] !== up.e[2])   continue;   // my T must equal his B
+      cand.push(o);
+    }
+    for (let n = cand.length-1; n > 0; n--){
+      const j = rndInt(0,n), tmp = cand[n]; cand[n] = cand[j]; cand[j] = tmp;
+    }
+    for (const o of cand){
+      grid[i] = o;
+      if (place(i+1)) return true;
+      grid[i] = null;
+    }
+    return false;
+  }
+
+  if (place(0)) return grid;
+
+  const t = rndInt(1,15);
+  for (let i = 0; i < grid.length; i++){
+    const c = i % G14_C, r = (i / G14_C) | 0;
+    const k = (r % 2 === 0) ? (c % 2) : (3 - (c % 2));
+    grid[i] = { t, k, e: tileEdges(t,k) };
+  }
+  return grid;
+}
+
+function makeLevel14(){
+  const cw = W/G14_C, ch = H/G14_R;
+  const size = Math.max(cw, ch);
+  const grid = solveGrid();
+
+  const cells = grid.map((o, i) => ({
+    c: i % G14_C, r: (i / G14_C) | 0,
+    img: A['tile' + o.t],
+    correct: o.k, k: o.k, ang: o.k * 90
+  }));
+
+  /* Break 1..3 tiles, each exactly one step ANTI-clockwise, so a single
+     clockwise tap fixes it. Keeps the whole scene inside the brief's
+     "1, 2 or 3 interactions" budget — a 180 error would cost 2 taps each
+     and a 3-tile round could run to 9, which is unplayable in 3 seconds. */
+  for (const idx of pickDistinct(cells.length, rndInt(1,3))){
+    const cell = cells[idx];
+    cell.k = (cell.correct + 3) % 4;
+    cell.ang = cell.k * 90;
+  }
+
+  return {
+    prompt: 'ROTATE!',
+    update(dt){
+      const t = 1 - Math.pow(0.0005, dt/1000);
+      for (const cell of cells) cell.ang = lerp(cell.ang, cell.k*90, t);
+    },
+    draw(c){
+      c.fillStyle = '#DEDEDA'; c.fillRect(0,0,W,H);
+      for (const cell of cells){
+        c.save();
+        c.translate((cell.c+0.5)*cw, (cell.r+0.5)*ch);
+        c.rotate(cell.ang*DEG);
+        c.drawImage(cell.img, -size/2, -size/2, size, size);
+        c.restore();
+      }
+    },
+    tap(px,py){
+      const ci = Math.floor(px/cw), ri = Math.floor(py/ch);
+      if (ci<0||ci>=G14_C||ri<0||ri>=G14_R) return false;
+      const cell = cells[ri*G14_C + ci];
+      cell.k = (cell.k + 1) % 4;
+      if (cell.k === 0) cell.ang -= 360;   // keep spinning clockwise past the wrap
+      return true;
+    },
+    solved(){ return cells.every(cell => cell.k === cell.correct); }
+  };
+}
+
+/* ============================================================
+   LEVEL 16 — MANHOLE, 15-DEGREE STEPS
+   Background road line breaks exactly at (1250, 2500) with a
+   600px radius gap; the cover carries the missing stripe, so
+   stripe continuity is the correctness cue.
+   ============================================================ */
+const MH_CX = 1250.5, MH_CY = 2500.5, MH_R = 600.5;
+
+function makeLevel16(){
+  const steps = rndInt(1,3);
+  let target = -15 * steps;
+  let ang = target;
+
+  return {
+    prompt: 'TURN!',
+    update(dt){
+      const t = 1 - Math.pow(0.0004, dt/1000);
+      ang = lerp(ang, target, t);
+    },
+    draw(c){
+      c.drawImage(A.bg16, 0, 0, W, H);
+      c.save();
+      c.translate(MH_CX, MH_CY); c.rotate(ang*DEG);
+      c.drawImage(A.manhole, -MH_R, -MH_R, MH_R*2, MH_R*2);
+      c.restore();
+    },
+    tap(px,py){
+      const dx = px-MH_CX, dy = py-MH_CY;
+      if (dx*dx + dy*dy > MH_R*MH_R) return false;
+      target += 15;
+      return true;
+    },
+    solved(){ return ((target % 360) + 360) % 360 === 0; }
+  };
+}
+
+/* ============================================================
+   LEVEL 18 — PILL TRAY
+   Tray runs x 251..2266, y 1000..4000 (2015 x 3000).
+   Pill is 571x271, white-left / blue-right at rotation 0.
+   ============================================================ */
+const TRAY_X = 251, TRAY_Y = 1000, TRAY_W = 2015, TRAY_H = 3000;
+const G18_C = 3, G18_R = 6;
+const PILL_W = 571, PILL_H = 271;
+
+function makeLevel18(){
+  const cw = TRAY_W/G18_C, ch = TRAY_H/G18_R;
+  const pills = [];
+  for (let r = 0; r < G18_R; r++)
+    for (let cIdx = 0; cIdx < G18_C; cIdx++)
+      pills.push({
+        x: TRAY_X + (cIdx+0.5)*cw,
+        y: TRAY_Y + (r+0.5)*ch,
+        flip: 0, ang: 0
+      });
+
+  for (const idx of pickDistinct(pills.length, rndInt(1,3))){
+    pills[idx].flip = 1;
+    pills[idx].ang  = 180;
+  }
+
+  return {
+    prompt: 'FLIP!',
+    update(dt){
+      const t = 1 - Math.pow(0.0004, dt/1000);
+      for (const p of pills) p.ang = lerp(p.ang, p.flip*180, t);
+    },
+    draw(c){
+      c.drawImage(A.bg18, 0, 0, W, H);
+      for (const p of pills){
+        c.save();
+        c.translate(p.x, p.y); c.rotate(p.ang*DEG);
+        c.drawImage(A.pill, -PILL_W/2, -PILL_H/2, PILL_W, PILL_H);
+        c.restore();
+      }
+    },
+    tap(px,py){
+      for (const p of pills){
+        if (Math.abs(px-p.x) < PILL_W/2 + 30 && Math.abs(py-p.y) < ch/2 - 10){
+          p.flip ^= 1;
+          if (p.flip === 0) p.ang -= 360;       // keep spinning the same way
+          return true;
+        }
+      }
+      return false;
+    },
+    solved(){ return pills.every(p => p.flip === 0); }
+  };
+}
+
+/* ============================================================
+   GAME SHELL
+   ============================================================ */
+const LEVELS = [makeLevel13, makeLevel14, makeLevel16, makeLevel18];
+
+let state = 'loading';      // loading | splash | play | win | lose
+let scene = null;
+let lastLevel = -1;
+let timeLeft = 0, phaseT = 0, promptT = 0;
+let shake = 0;
+
+function startRound(){
+  let i;
+  do { i = rndInt(0, LEVELS.length-1); } while (LEVELS.length > 1 && i === lastLevel);
+  lastLevel = i;
+  scene = LEVELS[i]();
+  timeLeft = ROUND_TIME;
+  promptT  = 850;
+  state = 'play';
+}
+
+function onTap(px,py){
+  if (state === 'splash'){ startRound(); return; }
+  if (state !== 'play' || !scene) return;
+  if (scene.tap(px,py)){
+    if (scene.solved()){ state = 'win'; phaseT = WIN_TIME; shake = 1; }
+  }
+}
+
+/* ---------- splash ---------- */
+function drawSplash(c, t){
+  c.drawImage(A.bgSplash, 0, 0, W, H);
+
+  const pw = 1561, ph = 1753;
+  const bob = Math.sin(t/620) * 22;
+  c.drawImage(A.picture, (W-pw)/2, 820 + bob, pw, ph);
+
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = '700 250px "Arial Black", Impact, sans-serif';
+  c.lineWidth = 46; c.lineJoin = 'round'; c.strokeStyle = CREAM;
+  c.strokeText('PUT IT BACK', W/2, 500);
+  c.fillStyle = PINK; c.fillText('PUT IT BACK', W/2, 500);
+
+  const bw = 1020, bh = 442;
+  const pulse = 1 + Math.sin(t/300)*0.035;
+  c.save();
+  c.translate(W/2, 3450);
+  c.scale(pulse, pulse);
+  c.drawImage(A.playBtn, -bw/2, -bh/2, bw, bh);
+  c.restore();
+
+  c.font = '600 110px "Arial Black", Impact, sans-serif';
+  c.fillStyle = 'rgba(255,255,255,.85)';
+  c.fillText('3 SECONDS. FIX THE SCENE.', W/2, 4050);
+}
+
+/* ---------- HUD ---------- */
+function drawTimer(c){
+  const frac = clamp(timeLeft / ROUND_TIME, 0, 1);
+  const barH = 64, pad = 26;
+  c.fillStyle = INK;
+  c.fillRect(0, 0, W, barH + pad*2);
+  c.fillStyle = 'rgba(255,255,255,.14)';
+  c.fillRect(pad, pad, W-pad*2, barH);
+  c.fillStyle = frac < 0.34 ? PINK : CREAM;
+  c.fillRect(pad, pad, (W-pad*2)*frac, barH);
+}
+
+function drawPrompt(c){
+  if (promptT <= 0 || !scene.prompt) return;
+  const a = clamp(promptT/450, 0, 1);
+  c.save();
+  c.globalAlpha = a;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = '700 210px "Arial Black", Impact, sans-serif';
+  c.lineWidth = 40; c.lineJoin = 'round'; c.strokeStyle = INK;
+  c.strokeText(scene.prompt, W/2, 300);
+  c.fillStyle = YELLOW; c.fillText(scene.prompt, W/2, 300);
+  c.restore();
+}
+
+/* ---------- GREAT! ---------- */
+const GREAT = 'GREAT!';
+function drawGreat(c, elapsed){
+  const flash = Math.floor(elapsed/70) % 2 === 0;
+  c.save();
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = '700 420px "Arial Black", Impact, sans-serif';
+
+  const widths = [];
+  let totalW = 0;
+  for (const ch of GREAT){ const w = c.measureText(ch).width; widths.push(w); totalW += w; }
+
+  let x = W/2 - totalW/2;
+  for (let i = 0; i < GREAT.length; i++){
+    const ch = GREAT[i];
+    const p  = clamp((elapsed - i*45)/230, 0, 1);
+    const pop = p < 1 ? 1 + Math.sin(p*Math.PI)*0.55 : 1;
+    const bob = Math.sin(elapsed/90 + i*0.7) * 34;
+    const tilt = Math.sin(elapsed/120 + i) * 5;
+
+    c.save();
+    c.translate(x + widths[i]/2, H/2 + bob);
+    c.rotate(tilt*DEG);
+    c.scale(pop, pop);
+    c.lineWidth = 64; c.lineJoin = 'round';
+    c.strokeStyle = INK;                       c.strokeText(ch, 0, 0);
+    c.fillStyle   = flash ? YELLOW : PINK;     c.fillText(ch, 0, 0);
+    c.restore();
+    x += widths[i];
+  }
+  c.restore();
+}
+
+/* ---------- loop ---------- */
+let prev = performance.now();
+function frame(now){
+  const dt = Math.min(now - prev, 50);
+  prev = now;
+
+  if (state === 'play'){
+    timeLeft -= dt;
+    promptT  -= dt;
+    if (timeLeft <= 0){ timeLeft = 0; state = 'lose'; phaseT = LOSE_TIME; }
+  } else if (state === 'win' || state === 'lose'){
+    phaseT -= dt;
+    if (phaseT <= 0) startRound();
+  }
+  if (scene) scene.update(dt);
+  if (shake > 0) shake = Math.max(0, shake - dt/260);
+
+  render(now);
+  requestAnimationFrame(frame);
+}
+
+function render(now){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.setTransform(viewScale,0,0,viewScale,0,0);
+
+  if (state === 'loading'){
+    ctx.fillStyle = TEAL; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = CREAM; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font = '700 150px "Arial Black", Impact, sans-serif';
+    ctx.fillText('LOADING ' + Math.round(loaded/total*100) + '%', W/2, H/2);
+    return;
+  }
+
+  if (state === 'splash'){ drawSplash(ctx, now); return; }
+
+  ctx.save();
+  if (shake > 0){
+    const m = shake * 26;
+    ctx.translate(rnd(-m,m), rnd(-m,m));
+  }
+  scene.draw(ctx);
+  ctx.restore();
+
+  if (state === 'play' || state === 'win' || state === 'lose') drawTimer(ctx);
+  if (state === 'play') drawPrompt(ctx);
+  if (state === 'win')  drawGreat(ctx, WIN_TIME - phaseT);
+  if (state === 'lose'){
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.30 * (1 - phaseT/LOSE_TIME)).toFixed(3) + ')';
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+/* ---------- plumbing ---------- */
+function resize(){
+  const aw = window.innerWidth, ah = window.innerHeight;
+  let w = aw, h = w*2;
+  if (h > ah){ h = ah; w = h/2; }
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.style.width  = w + 'px';
+  cv.style.height = h + 'px';
+  cv.width  = Math.round(w*dpr);
+  cv.height = Math.round(h*dpr);
+  viewScale = cv.width / W;
+  ctx.imageSmoothingQuality = 'high';
+}
+window.addEventListener('resize', resize);
+
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect();
+  onTap((e.clientX - r.left)/r.width * W, (e.clientY - r.top)/r.height * H);
+});
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'r' || e.key === 'R') startRound();
+  if (e.key === 'Escape') state = 'splash';
+});
+
+resize();
+loadAll(() => {
+  if (loadFailed.length){
+    ctx.setTransform(viewScale,0,0,viewScale,0,0);
+    ctx.fillStyle = '#7a1520'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#fff'; ctx.textAlign='center'; ctx.font='90px sans-serif';
+    ctx.fillText('Missing assets:', W/2, H/2 - 200);
+    loadFailed.slice(0,8).forEach((f,i) => ctx.fillText(f, W/2, H/2 - 60 + i*110));
+    return;
+  }
+  state = 'splash';
+});
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

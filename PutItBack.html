@@ -318,6 +318,117 @@ function makeLevel14(){
 }
 
 /* ============================================================
+   LEVEL 14b — CIRCLES (same sprites, different construction)
+
+   Each tile's two arcs sit on a DIAGONAL pair of its corners, and
+   a diagonal pair always shares corner-parity. So if every tile
+   puts its arcs on the diagonal whose corners are even-parity,
+   every arc lands on an even corner — and each even corner
+   collects the four quarter-arcs around it into a closed circle.
+
+     tile (c,r) uses TL/BR when (c+r) is even, TR/BL when odd
+
+   Circle colour is then a graph problem: neighbouring circles are
+   joined by a tile, so their two colours must be a pair some tile
+   actually carries. Walking a cycle in that colour graph keeps
+   every join legal, and gives bands of coloured rings.
+   ============================================================ */
+const CIRC_C = 4, CIRC_R = 8;
+
+// 4-cycles in the tile colour graph (verified exhaustively)
+const COLOUR_CYCLES = [
+  ['green','orange','teal','red'],
+  ['green','pink','blue','red'],
+  ['red','blue','yellow','lgreen'],
+  ['blue','coral','grey','yellow']
+];
+
+// which corners a tile's arcs occupy at rotation k
+function tileCorners(t, k){
+  const e = tileEdges(t,k);
+  return {
+    tl: e[0]===e[3] ? e[0] : null,
+    tr: e[0]===e[1] ? e[0] : null,
+    br: e[1]===e[2] ? e[1] : null,
+    bl: e[2]===e[3] ? e[2] : null
+  };
+}
+
+// the unique tile+rotation whose arc corners carry the requested colours
+function findTileForCorners(req){
+  for (let t = 1; t <= 15; t++)
+    for (let k = 0; k < 4; k++){
+      const cc = tileCorners(t,k);
+      let ok = true;
+      for (const key in req) if (cc[key] !== req[key]) { ok = false; break; }
+      if (ok) return { t, k };
+    }
+  return null;
+}
+
+function makeLevelCircles(){
+  const cw = W/CIRC_C, ch = H/CIRC_R;
+  const size = Math.max(cw, ch);
+
+  // a 4-colour cycle, or sometimes a plain two-colour alternation
+  let cyc;
+  if (Math.random() < 0.72) cyc = COLOUR_CYCLES[rndInt(0, COLOUR_CYCLES.length-1)];
+  else cyc = TILE_PAIR[rndInt(1,15)].slice();
+  const byCol = Math.random() < 0.5;          // bands run vertically or horizontally
+
+  const colourAt = (i,j) => cyc[ ((byCol ? i : j) % cyc.length + cyc.length) % cyc.length ];
+
+  const cells = [];
+  let failed = false;
+  for (let r = 0; r < CIRC_R; r++)
+    for (let c = 0; c < CIRC_C; c++){
+      const even = ((c + r) % 2 === 0);
+      const req = even
+        ? { tl: colourAt(c,   r  ), br: colourAt(c+1, r+1) }
+        : { tr: colourAt(c+1, r  ), bl: colourAt(c,   r+1) };
+      const f = findTileForCorners(req);
+      if (!f){ failed = true; break; }
+      cells.push({ c, r, img: A['tile'+f.t], correct: f.k, k: f.k, ang: f.k*90 });
+    }
+
+  if (failed) return makeLevel14();          // never leave the player without a scene
+
+  // break 1..3 tiles by one anti-clockwise step, so one tap fixes each
+  for (const idx of pickDistinct(cells.length, rndInt(1,3))){
+    const cell = cells[idx];
+    cell.k = (cell.correct + 3) % 4;
+    cell.ang = cell.k * 90;
+  }
+
+  return {
+    prompt: 'ROTATE!',
+    update(dt){
+      const t = 1 - Math.pow(0.0005, dt/1000);
+      for (const cell of cells) cell.ang = lerp(cell.ang, cell.k*90, t);
+    },
+    draw(c){
+      c.fillStyle = '#DEDEDA'; c.fillRect(0,0,W,H);
+      for (const cell of cells){
+        c.save();
+        c.translate((cell.c+0.5)*cw, (cell.r+0.5)*ch);
+        c.rotate(cell.ang*DEG);
+        c.drawImage(cell.img, -size/2, -size/2, size, size);
+        c.restore();
+      }
+    },
+    tap(px,py){
+      const ci = Math.floor(px/cw), ri = Math.floor(py/ch);
+      if (ci<0||ci>=CIRC_C||ri<0||ri>=CIRC_R) return false;
+      const cell = cells[ri*CIRC_C + ci];
+      cell.k = (cell.k + 1) % 4;
+      if (cell.k === 0) cell.ang -= 360;
+      return true;
+    },
+    solved(){ return cells.every(cell => cell.k === cell.correct); }
+  };
+}
+
+/* ============================================================
    LEVEL 16 — MANHOLE, 15-DEGREE STEPS
    Background road line breaks exactly at (1250, 2500) with a
    600px radius gap; the cover carries the missing stripe, so
@@ -356,20 +467,78 @@ function makeLevel16(){
 /* ============================================================
    LEVEL 18 — PILL TRAY
    Tray runs x 251..2266, y 1000..4000 (2015 x 3000).
-   Pill is 571x271, white-left / blue-right at rotation 0.
+   Pill art is 571x271, white-left / blue-right at rotation 0.
+   Grid is randomised 2-3 columns x 3-6 rows; pills scale to the
+   column and the row block centres in the tray.
+   Each round picks ONE colourway and every pill shares it.
    ============================================================ */
 const TRAY_X = 251, TRAY_Y = 1000, TRAY_W = 2015, TRAY_H = 3000;
-const G18_C = 3, G18_R = 6;
 const PILL_W = 571, PILL_H = 271;
+const PILL_AR = PILL_W / PILL_H;
+const PILL_SPLIT = 286;          // x where the light half meets the colour half
+
+/* The art's colour half is blue (63,178,234); the light half and the grey
+   ring are near-neutral, so a hue rotation swings the colour half hard and
+   leaves the rest alone. Light half gets its own low-alpha wash so the two
+   halves stay related. Verified against the CSS hue-rotate matrix. */
+const PILL_PALETTES = [
+  { hue:   0, sat: 1.0, bri: 1.00, tint: null },                      // blue (original)
+  { hue: -60, sat: 1.0, bri: 1.00, tint: 'rgba(214,240,220,.40)' },   // green
+  { hue:-100, sat: 1.2, bri: 1.00, tint: 'rgba(226,242,198,.40)' },   // lime
+  { hue:  75, sat: 1.1, bri: 0.95, tint: 'rgba(226,214,246,.42)' },   // violet
+  { hue: 120, sat: 1.0, bri: 1.00, tint: 'rgba(250,214,232,.42)' },   // pink
+  { hue: 150, sat: 1.1, bri: 0.98, tint: 'rgba(250,212,206,.42)' },   // red
+  { hue: 185, sat: 1.2, bri: 1.00, tint: 'rgba(252,226,192,.45)' },   // orange
+  { hue: 215, sat: 1.3, bri: 1.12, tint: 'rgba(250,240,190,.45)' }    // mustard
+];
+let PILL_VARIANTS = null;
+
+function buildPillVariants(){
+  PILL_VARIANTS = PILL_PALETTES.map(p => {
+    const off = document.createElement('canvas');
+    off.width = PILL_W; off.height = PILL_H;
+    const o = off.getContext('2d');
+    const canFilter = (typeof o.filter === 'string');
+    if (canFilter && (p.hue || p.sat !== 1 || p.bri !== 1))
+      o.filter = 'hue-rotate(' + p.hue + 'deg) saturate(' + p.sat + ') brightness(' + p.bri + ')';
+    o.drawImage(A.pill, 0, 0, PILL_W, PILL_H);
+    if (canFilter) o.filter = 'none';
+    if (p.tint){
+      o.globalCompositeOperation = 'source-atop';   // paints only on existing pixels
+      o.fillStyle = p.tint;
+      o.fillRect(0, 0, PILL_SPLIT, PILL_H);
+      o.globalCompositeOperation = 'source-over';
+    }
+    return off;
+  });
+}
 
 function makeLevel18(){
-  const cw = TRAY_W/G18_C, ch = TRAY_H/G18_R;
+  if (!PILL_VARIANTS) buildPillVariants();     // lazy guard: never start a round unbuilt
+  const cols = rndInt(2,3);
+  const rows = rndInt(3,6);
+  const cw = TRAY_W/cols;
+  const art = PILL_VARIANTS[rndInt(0, PILL_VARIANTS.length-1)];
+
+  // fit the pill to the column, preserving aspect
+  let pw = cw * 0.82;
+  let ph = pw / PILL_AR;
+  const maxH = (TRAY_H/rows) * 0.62;
+  if (ph > maxH){ ph = maxH; pw = ph * PILL_AR; }
+
+  /* Row pitch is driven by the pill, not the tray: with only 3 rows a
+     full-height spread leaves the blister looking half-empty, so the
+     block tightens up and centres instead. */
+  const pitch = Math.min(TRAY_H/rows, ph * 2.15);
+  const blockH = pitch * rows;
+  const startY = TRAY_Y + (TRAY_H - blockH)/2;
+
   const pills = [];
-  for (let r = 0; r < G18_R; r++)
-    for (let cIdx = 0; cIdx < G18_C; cIdx++)
+  for (let r = 0; r < rows; r++)
+    for (let cIdx = 0; cIdx < cols; cIdx++)
       pills.push({
         x: TRAY_X + (cIdx+0.5)*cw,
-        y: TRAY_Y + (r+0.5)*ch,
+        y: startY + (r+0.5)*pitch,
         flip: 0, ang: 0
       });
 
@@ -377,6 +546,10 @@ function makeLevel18(){
     pills[idx].flip = 1;
     pills[idx].ang  = 180;
   }
+
+  // hit box: full column width, half the row pitch so rows never overlap
+  const hitW = cw/2 - 10;
+  const hitH = pitch/2 - 8;
 
   return {
     prompt: 'FLIP!',
@@ -389,13 +562,13 @@ function makeLevel18(){
       for (const p of pills){
         c.save();
         c.translate(p.x, p.y); c.rotate(p.ang*DEG);
-        c.drawImage(A.pill, -PILL_W/2, -PILL_H/2, PILL_W, PILL_H);
+        c.drawImage(art, -pw/2, -ph/2, pw, ph);
         c.restore();
       }
     },
     tap(px,py){
       for (const p of pills){
-        if (Math.abs(px-p.x) < PILL_W/2 + 30 && Math.abs(py-p.y) < ch/2 - 10){
+        if (Math.abs(px-p.x) < hitW && Math.abs(py-p.y) < hitH){
           p.flip ^= 1;
           if (p.flip === 0) p.ang -= 360;       // keep spinning the same way
           return true;
@@ -410,7 +583,7 @@ function makeLevel18(){
 /* ============================================================
    GAME SHELL
    ============================================================ */
-const LEVELS = [makeLevel13, makeLevel14, makeLevel16, makeLevel18];
+const LEVELS = [makeLevel13, makeLevel14, makeLevelCircles, makeLevel16, makeLevel18];
 
 let state = 'loading';      // loading | splash | play | win | lose
 let scene = null;
@@ -610,6 +783,7 @@ loadAll(() => {
     loadFailed.slice(0,8).forEach((f,i) => ctx.fillText(f, W/2, H/2 - 60 + i*110));
     return;
   }
+  buildPillVariants();
   state = 'splash';
 });
 requestAnimationFrame(frame);

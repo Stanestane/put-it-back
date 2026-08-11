@@ -602,7 +602,12 @@ function startRound(){
 }
 
 function onTap(px,py){
-  if (state === 'splash'){ startRound(); return; }
+  if (state === 'splash'){
+    // Play starts the game, the picture tilts, everything else is inert
+    if (Math.abs(px-PLAY_CX) < PLAY_W/2 + 40 && Math.abs(py-PLAY_CY) < PLAY_H/2 + 40) startRound();
+    else if (hitPicture(px,py)) nudgePicture();
+    return;
+  }
   if (state !== 'play' || !scene) return;
   if (scene.tap(px,py)){
     if (scene.solved()){ state = 'win'; phaseT = WIN_TIME; shake = 1; }
@@ -610,12 +615,57 @@ function onTap(px,py){
 }
 
 /* ---------- splash ---------- */
+/* The picture hangs like a framed print: it pivots near the top edge
+   rather than its centre, so a tilt reads as swinging on a nail. Every
+   time the splash is entered it settles at a random small angle, and
+   each tap kicks it the OTHER way. */
+const PIC_W = 1561, PIC_H = 1753;
+const PIC_X = (W - PIC_W)/2, PIC_Y = 820;
+const PIC_PIVOT_Y = PIC_Y + PIC_H * 0.10;
+const PLAY_W = 1020, PLAY_H = 442, PLAY_CX = W/2, PLAY_CY = 3450;
+
+let picAng = 0, picVel = 0, picTarget = 0, picSign = 1, picBob = 0;
+
+/* Hit-test the frame in its own rotated space: undo the tilt about the
+   pivot, then test the upright rectangle. */
+function hitPicture(px, py){
+  const a = -picAng * DEG, cs = Math.cos(a), sn = Math.sin(a);
+  const dx = px - W/2, dy = py - (PIC_PIVOT_Y + picBob);
+  const lx = dx*cs - dy*sn;
+  const ly = dx*sn + dy*cs;
+  return lx >= PIC_X - W/2 && lx <= PIC_X + PIC_W - W/2
+      && ly >= PIC_Y - PIC_PIVOT_Y && ly <= PIC_Y + PIC_H - PIC_PIVOT_Y;
+}
+
+function resetSplashTilt(){
+  picSign   = Math.random() < 0.5 ? -1 : 1;
+  picTarget = picSign * rnd(2.5, 6);
+  picAng    = picTarget * 1.4;      // overshoot, then settle in
+  picVel    = 0;
+}
+
+function nudgePicture(){
+  picSign   = -picSign;             // always the opposite way
+  picTarget = picSign * rnd(2.5, 6);
+  picVel   += picSign * rnd(20, 34);
+}
+
+function updateSplashTilt(dt){
+  const s = Math.min(dt, 32)/1000;
+  picVel += (picTarget - picAng) * 95 * s;
+  picVel *= Math.exp(-6.2 * s);     // damping
+  picAng += picVel * s;
+}
+
 function drawSplash(c, t){
   c.drawImage(A.bgSplash, 0, 0, W, H);
 
-  const pw = 1561, ph = 1753;
-  const bob = Math.sin(t/620) * 22;
-  c.drawImage(A.picture, (W-pw)/2, 820 + bob, pw, ph);
+  picBob = Math.sin(t/620) * 22;
+  c.save();
+  c.translate(W/2, PIC_PIVOT_Y + picBob);
+  c.rotate(picAng * DEG);
+  c.drawImage(A.picture, PIC_X - W/2, PIC_Y - PIC_PIVOT_Y, PIC_W, PIC_H);
+  c.restore();
 
   c.textAlign = 'center'; c.textBaseline = 'middle';
   c.font = '700 250px "Arial Black", Impact, sans-serif';
@@ -623,12 +673,11 @@ function drawSplash(c, t){
   c.strokeText('PUT IT BACK', W/2, 500);
   c.fillStyle = PINK; c.fillText('PUT IT BACK', W/2, 500);
 
-  const bw = 1020, bh = 442;
   const pulse = 1 + Math.sin(t/300)*0.035;
   c.save();
-  c.translate(W/2, 3450);
+  c.translate(PLAY_CX, PLAY_CY);
   c.scale(pulse, pulse);
-  c.drawImage(A.playBtn, -bw/2, -bh/2, bw, bh);
+  c.drawImage(A.playBtn, -PLAY_W/2, -PLAY_H/2, PLAY_W, PLAY_H);
   c.restore();
 
   c.font = '600 110px "Arial Black", Impact, sans-serif';
@@ -704,6 +753,8 @@ function frame(now){
     timeLeft -= dt;
     promptT  -= dt;
     if (timeLeft <= 0){ timeLeft = 0; state = 'lose'; phaseT = LOSE_TIME; }
+  } else if (state === 'splash'){
+    updateSplashTilt(dt);
   } else if (state === 'win' || state === 'lose'){
     phaseT -= dt;
     if (phaseT <= 0) startRound();
@@ -770,7 +821,7 @@ cv.addEventListener('pointerdown', e => {
 
 window.addEventListener('keydown', e => {
   if (e.key === 'r' || e.key === 'R') startRound();
-  if (e.key === 'Escape') state = 'splash';
+  if (e.key === 'Escape'){ state = 'splash'; resetSplashTilt(); }
 });
 
 resize();
@@ -784,6 +835,7 @@ loadAll(() => {
     return;
   }
   buildPillVariants();
+  resetSplashTilt();
   state = 'splash';
 });
 requestAnimationFrame(frame);

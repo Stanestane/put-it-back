@@ -1,0 +1,14 @@
+# CorelDRAW source artwork
+# Working files only — the game runs from the exported PNGs in Assets/.
+# These are large binaries (~50 MB) that Git stores in full on every change.
+Corel/
+*.cdr
+*.cdr.bak
+
+# OS / editor cruft
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+*~

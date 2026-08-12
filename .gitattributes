@@ -1,0 +1,21 @@
+# Normalise line endings: store LF in the repo, check out LF everywhere.
+# Without this, core.autocrlf=true on Windows gives collaborators on
+# macOS/Linux different bytes than the ones committed here.
+* text=auto eol=lf
+
+# Explicitly binary — never touch these, never try to diff them as text.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.cdr  binary
+*.pdf  binary
+*.mp3  binary
+*.wav  binary
+*.ogg  binary
+
+# Batch files genuinely need CRLF to run on Windows.
+*.bat text eol=crlf
+*.cmd text eol=crlf

@@ -41,6 +41,11 @@ const INK    = '#2D3446';
 /* ---------- asset manifest ---------- */
 const A = {};
 const MANIFEST = {
+  bg1:       'Assets/Background_Level1.png',
+  fireplace: 'Assets/Fireplace_Level1.png',
+  pic1:      'Assets/Picture_Level1.png',
+  bg4:       'Assets/Background_Level4.png',
+  win4:      'Assets/Window_Level4.png',
   bg13:      'Assets/Background_Level13.png',
   bg16:      'Assets/Background_Level16.png',
   bg18:      'Assets/Background_Level18.png',
@@ -82,6 +87,132 @@ function pickDistinct(n, k){            // k distinct indices out of n
 
 function rotateAbout(c, cx, cy, deg){
   c.translate(cx, cy); c.rotate(deg*DEG); c.translate(-cx, -cy);
+}
+
+/* ============================================================
+   LEVEL 1 — FIREPLACE AND PICTURE
+   Background wall meets the floor at y=3306. The fireplace sits
+   500px BELOW that seam so it stands on the floor plane rather
+   than balancing on the join, and the picture centres in the
+   wall space above it.
+   Three independent faults, 1..3 of them active per round:
+     - fireplace slid off centre
+     - picture slid off centre
+     - picture hanging crooked
+   Tapping the fireplace slides it home. Tapping the picture
+   corrects ONE fault per tap (position first, then tilt), which
+   keeps the round inside the 1..3 interaction budget.
+   ============================================================ */
+const L1_FLOOR = 3810;
+const FP_W = 1701, FP_H = 1401, FP_Y = L1_FLOOR - FP_H;
+const P1_W = 1701, P1_H = 1001, P1_Y = Math.round((FP_Y - P1_H)/2);
+const P1_PIVOT_DY = P1_H * 0.12;        // hangs from near its top edge
+
+function makeLevel1(){
+  const faults = pickDistinct(3, rndInt(1,3));
+  const sign = () => (Math.random() < 0.5 ? -1 : 1);
+
+  const fp  = { dx:0, tdx:0 };
+  const pic = { dx:0, tdx:0, ang:0, tang:0 };
+
+  if (faults.includes(0)) fp.dx  = fp.tdx  = rnd(210,390) * sign();
+  if (faults.includes(1)) pic.dx = pic.tdx = rnd(210,400) * sign();
+  if (faults.includes(2)) pic.ang = pic.tang = rnd(5,11)  * sign();
+
+  function hitPic(px,py){
+    const a = -pic.ang*DEG, cs = Math.cos(a), sn = Math.sin(a);
+    const dx = px - (W/2 + pic.dx), dy = py - (P1_Y + P1_PIVOT_DY);
+    const lx = dx*cs - dy*sn, ly = dx*sn + dy*cs;
+    return lx >= -P1_W/2 - 60 && lx <= P1_W/2 + 60
+        && ly >= -P1_PIVOT_DY - 60 && ly <= P1_H - P1_PIVOT_DY + 60;
+  }
+
+  return {
+    prompt: 'TIDY UP!',
+    update(dt){
+      const t = 1 - Math.pow(0.0008, dt/1000);
+      fp.dx   = lerp(fp.dx,   fp.tdx,   t);
+      pic.dx  = lerp(pic.dx,  pic.tdx,  t);
+      pic.ang = lerp(pic.ang, pic.tang, t);
+    },
+    draw(c){
+      c.drawImage(A.bg1, 0, 0, W, H);
+      c.drawImage(A.fireplace, (W-FP_W)/2 + fp.dx, FP_Y, FP_W, FP_H);
+      c.save();
+      c.translate(W/2 + pic.dx, P1_Y + P1_PIVOT_DY);
+      c.rotate(pic.ang*DEG);
+      c.drawImage(A.pic1, -P1_W/2, -P1_PIVOT_DY, P1_W, P1_H);
+      c.restore();
+    },
+    tap(px,py){
+      if (hitPic(px,py)){
+        if (pic.tdx !== 0){ pic.tdx = 0; return true; }      // slide home first
+        if (pic.tang !== 0){ pic.tang = 0; return true; }     // then straighten
+        return false;
+      }
+      const fx = W/2 + fp.dx;
+      if (Math.abs(px-fx) < FP_W/2 + 40 && py > FP_Y - 40 && py < FP_Y + FP_H + 40){
+        if (fp.tdx !== 0){ fp.tdx = 0; return true; }
+        return false;
+      }
+      return false;
+    },
+    solved(){ return fp.tdx === 0 && pic.tdx === 0 && pic.tang === 0; }
+  };
+}
+
+/* ============================================================
+   LEVEL 4 — TOWER WINDOWS
+   The tower's axis is dead centre (x = 1250.5). Grey bands split
+   the shaft into four storeys; the lowest already carries a door
+   in the background art, so windows belong on the three above it.
+   Floor centres and the tower's half-width there were measured
+   off the background; the shaft tapers, so each floor gets its
+   own offset limit to keep a shoved window on the stonework.
+   1..3 windows start off-centre; one tap slides each one home.
+   ============================================================ */
+const W4_W = 233, W4_H = 274;
+const W4_FLOORS = [
+  { cy: 1919, maxOff: 220 },      // narrowest storey
+  { cy: 2475, maxOff: 250 },
+  { cy: 3033, maxOff: 295 }       // widest storey
+];
+
+function makeLevel4(){
+  const wins = W4_FLOORS.map(f => ({
+    cy: f.cy, maxOff: f.maxOff, dx: 0, tdx: 0, off: false
+  }));
+
+  for (const idx of pickDistinct(wins.length, rndInt(1,3))){
+    const w = wins[idx];
+    w.dx = w.tdx = rnd(115, w.maxOff) * (Math.random() < 0.5 ? -1 : 1);
+    w.off = true;
+  }
+
+  return {
+    prompt: 'CENTRE!',
+    update(dt){
+      const t = 1 - Math.pow(0.0008, dt/1000);
+      for (const w of wins) w.dx = lerp(w.dx, w.tdx, t);
+    },
+    draw(c){
+      c.drawImage(A.bg4, 0, 0, W, H);
+      for (const w of wins)
+        c.drawImage(A.win4, W/2 + w.dx - W4_W/2, w.cy - W4_H/2, W4_W, W4_H);
+    },
+    tap(px,py){
+      for (const w of wins){
+        if (!w.off) continue;
+        if (Math.abs(px - (W/2 + w.dx)) < W4_W/2 + 70 &&
+            Math.abs(py - w.cy)        < W4_H/2 + 70){
+          w.tdx = 0; w.off = false;
+          return true;
+        }
+      }
+      return false;
+    },
+    solved(){ return wins.every(w => !w.off); }
+  };
 }
 
 /* ============================================================
@@ -583,7 +714,7 @@ function makeLevel18(){
 /* ============================================================
    GAME SHELL
    ============================================================ */
-const LEVELS = [makeLevel13, makeLevel14, makeLevelCircles, makeLevel16, makeLevel18];
+const LEVELS = [makeLevel1, makeLevel4, makeLevel13, makeLevel14, makeLevelCircles, makeLevel16, makeLevel18];
 
 let state = 'loading';      // loading | splash | play | win | lose
 let scene = null;

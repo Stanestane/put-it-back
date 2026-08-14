@@ -1,0 +1,25 @@
+{
+  "name": "put-it-back",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/Stanestane/put-it-back#readme",
+  "bugs": {
+    "url": "https://github.com/Stanestane/put-it-back/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stanestane/put-it-back.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0"
+  }
+}

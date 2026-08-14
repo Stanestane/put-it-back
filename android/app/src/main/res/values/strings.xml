@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PutItBack</string>
+    <string name="title_activity_main">PutItBack</string>
+    <string name="package_name">com.vdsystem.putitback</string>
+    <string name="custom_url_scheme">com.vdsystem.putitback</string>
+</resources>

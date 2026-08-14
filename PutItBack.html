@@ -23,7 +23,7 @@
    ============================================================ */
 
 const W = 2501, H = 5001;
-const ROUND_TIME = 3000;      // ms per micro-game
+const ROUND_TIME = 5000;      // ms per micro-game
 const WIN_TIME   = 1100;      // ms of "GREAT!"
 const LOSE_TIME  = 500;       // ms of dead air on timeout
 
@@ -46,6 +46,10 @@ const MANIFEST = {
   pic1:      'Assets/Picture_Level1.png',
   bg4:       'Assets/Background_Level4.png',
   win4:      'Assets/Window_Level4.png',
+  bg8:       'Assets/Background_Level8.png',
+  drawer:    'Assets/Drawer_Level8.png',
+  drawerBot: 'Assets/Drawer_Bottom_Level8.png',
+  handle:    'Assets/Handle_Level8.png',
   bg13:      'Assets/Background_Level13.png',
   bg16:      'Assets/Background_Level16.png',
   bg18:      'Assets/Background_Level18.png',
@@ -212,6 +216,75 @@ function makeLevel4(){
       return false;
     },
     solved(){ return wins.every(w => !w.off); }
+  };
+}
+
+/* ============================================================
+   LEVEL 8 — NIGHTSTAND HANDLES
+   The stand is built by stacking drawer pieces: Drawer_Level8 is
+   595 tall with its face inset at (137,137)-(1522,594), and
+   Drawer_Bottom_Level8 is the same piece plus 273px of base and
+   legs. So N drawers = (N-1) plain pieces + 1 bottom piece, and
+   the top piece's frame forms the cabinet's top edge.
+   Each handle belongs dead centre of its drawer face; 1..3 start
+   shoved off, and one tap slides each back.
+   ============================================================ */
+const NS_W = 1660, NS_PIECE = 595, NS_BOTTOM = 868;
+const NS_X = (W - NS_W)/2;
+const FACE_CX = 829.5, FACE_CY = 365.5;   // face centre within a piece
+const NS_BASE = 4300;                     // underside of the legs
+const HANDLE = 150;
+
+function makeLevel8(){
+  const drawers = rndInt(2,4);
+  const total   = (drawers-1)*NS_PIECE + NS_BOTTOM;
+  const top     = NS_BASE - total;
+
+  const handles = [];
+  for (let i = 0; i < drawers; i++)
+    handles.push({
+      cx: NS_X + FACE_CX,
+      cy: top + i*NS_PIECE + FACE_CY,
+      dx:0, dy:0, tdx:0, tdy:0, off:false
+    });
+
+  // face is 1386x458, handle 150 — plenty of room sideways, little vertically
+  for (const idx of pickDistinct(handles.length, rndInt(1, Math.min(3, drawers)))){
+    const h = handles[idx];
+    h.tdx = h.dx = rnd(150, 470) * (Math.random() < 0.5 ? -1 : 1);
+    h.tdy = h.dy = rnd(-105, 105);
+    h.off = true;
+  }
+
+  return {
+    prompt: 'HANDLES!',
+    update(dt){
+      const t = 1 - Math.pow(0.0008, dt/1000);
+      for (const h of handles){
+        h.dx = lerp(h.dx, h.tdx, t);
+        h.dy = lerp(h.dy, h.tdy, t);
+      }
+    },
+    draw(c){
+      c.drawImage(A.bg8, 0, 0, W, H);
+      for (let i = 0; i < drawers-1; i++)
+        c.drawImage(A.drawer, NS_X, top + i*NS_PIECE, NS_W, NS_PIECE);
+      c.drawImage(A.drawerBot, NS_X, top + (drawers-1)*NS_PIECE, NS_W, NS_BOTTOM);
+      for (const h of handles)
+        c.drawImage(A.handle, h.cx + h.dx - HANDLE/2, h.cy + h.dy - HANDLE/2, HANDLE, HANDLE);
+    },
+    tap(px,py){
+      for (const h of handles){
+        if (!h.off) continue;
+        if (Math.abs(px - (h.cx + h.dx)) < HANDLE/2 + 90 &&
+            Math.abs(py - (h.cy + h.dy)) < HANDLE/2 + 90){
+          h.tdx = 0; h.tdy = 0; h.off = false;
+          return true;
+        }
+      }
+      return false;
+    },
+    solved(){ return handles.every(h => !h.off); }
   };
 }
 
@@ -714,7 +787,7 @@ function makeLevel18(){
 /* ============================================================
    GAME SHELL
    ============================================================ */
-const LEVELS = [makeLevel1, makeLevel4, makeLevel13, makeLevel14, makeLevelCircles, makeLevel16, makeLevel18];
+const LEVELS = [makeLevel1, makeLevel4, makeLevel8, makeLevel13, makeLevel14, makeLevelCircles, makeLevel16, makeLevel18];
 
 let state = 'loading';      // loading | splash | play | win | lose
 let scene = null;
@@ -813,7 +886,7 @@ function drawSplash(c, t){
 
   c.font = '600 110px "Arial Black", Impact, sans-serif';
   c.fillStyle = 'rgba(255,255,255,.85)';
-  c.fillText('3 SECONDS. FIX THE SCENE.', W/2, 4050);
+  c.fillText(Math.round(ROUND_TIME/1000) + ' SECONDS. FIX THE SCENE.', W/2, 4050);
 }
 
 /* ---------- HUD ---------- */

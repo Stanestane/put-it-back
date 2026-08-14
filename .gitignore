@@ -5,6 +5,11 @@ Corel/
 *.cdr
 *.cdr.bak
 
+# Export archives — the loose PNGs in Assets/ are what the game loads.
+*.zip
+*.rar
+*.7z
+
 # OS / editor cruft
 Thumbs.db
 ehthumbs.db

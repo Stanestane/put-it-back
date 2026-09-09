@@ -135,7 +135,7 @@ func test_order() -> void:
 
 func test_garden() -> void:
 	check(game.pieces.size() == 8,"Garden must have eight bushes")
-	check(fault_count() >= 1 and fault_count() <= 3,"Garden must start with 1–3 loose bushes")
+	check(fault_count() == 1,"Garden must start with one slightly displaced bush")
 	var loose: Array[int] = []
 	var occupied: Array[int] = []
 	for i in game.pieces.size():

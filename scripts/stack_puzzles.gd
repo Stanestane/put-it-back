@@ -1,15 +1,6 @@
 extends RefCounted
 ## Plate and cookie stacks share artwork-space geometry and visible-surface input.
 static func build(g, id: int) -> void:
-	if id == 103:
-		g.background = "Background_Level3"
-		g.prompt = "DRAG: BIG TO SMALL!"
-		for i in 6:
-			var width = 1900.0-i*220.0
-			var p = g.add_piece("Plate_Level3",Vector2(1250.5,2400+i*200),Vector2(width,width*440/1600),"reorder")
-			p.stack = true
-		g.interaction.setup_vertical_order(2400,200)
-		return
 	var plates = id == 3
 	g.background = "Background_Level3" if plates else "Background_Level20"
 	g.prompt = "CENTRE THE PLATES!" if plates else ("FACE LEFT!" if id == 20 else "CENTRE THE COOKIES!")
@@ -27,6 +18,6 @@ static func build(g, id: int) -> void:
 		if id == 20:
 			p.name = "Bar2_Level20"
 		else:
-			var magnitude = randf_range(180,280) if plates else randf_range(135,220)
+			var magnitude = randf_range(70,115) if plates else randf_range(65,105)
 			p.target.x += magnitude*[-1,1].pick_random()
 			p.pos = p.target

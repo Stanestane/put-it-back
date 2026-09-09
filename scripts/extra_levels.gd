@@ -10,7 +10,7 @@ static func build(g, id: int) -> void:
 					g.add_piece("Button%d_Level2" % (r*2+c+1),Vector2(910+c*680,1110+r*510),Vector2(410,410),"rotate")
 			for i in 3:
 				g.add_piece(["Button_close_Level2","Button_open_Level2","Button_alarm_Level2"][i],Vector2(770+i*480,3870),Vector2(385,385),"rotate")
-		3,103,20,120:
+		3,20,120:
 			Stacks.build(g,id)
 			return
 		5:
@@ -38,7 +38,7 @@ static func build(g, id: int) -> void:
 			for i in 3:
 				g.add_piece("Hanger_Level9",Vector2(650+i*600,950),Vector2(114,114))
 				var p = g.art("Wrench_Level9",467+i*600,790,366,1940,"rotate")
-				p.step = 12.0
+				p.step = 6.0
 		10:
 			g.prompt = "DRAG INTO COLOR ORDER!"
 			for i in 12: g.art("Pencil%d_Level10" % (i+1),415+i*140,280,90,2053,"reorder")
@@ -51,10 +51,16 @@ static func build(g, id: int) -> void:
 					var angle = [[0,90],[270,180]][r%2][c%2]
 					g.add_piece("Tile_Level12",Vector2(312.5+c*625,312.5+r*625),Vector2(625,625),"rotate",angle)
 		15:
-			g.prompt = "REPAIR THE WALL!"
+			g.prompt = "FLIP THE ODD BRICK!"
 			for r in 6:
 				for c in 3:
-					g.art("Bricks_Level15",170+c*650+(r%2)*80,1950+r*280,650,280,"move")
+					g.art("Bricks_Level15",275.5+c*650,1660+r*280,650,280,"mirror")
+			# This sprite is 180-degree symmetric. Mirror one segment so the
+			# running brick joints break, while every segment stays on its grid.
+			var p = g.pieces[randi_range(1,4)*3+randi_range(0,2)]
+			p.flip_h = true
+			p.faults = 1
+			return
 		17:
 			g.prompt = "FIT THE PARQUET!"
 			for r in 5:
@@ -77,9 +83,25 @@ static func build(g, id: int) -> void:
 			g.interaction.swap_neighbors()
 			return
 		21:
-			g.prompt = "FIX THE TILES!"
-			for r in 6:
-				for c in 6: g.art("Tile_Level21",125+c*250,2000+r*250,250,250,"move")
+			g.prompt = "ALIGN THE ODD TILE!"
+			# The source floor starts at y=1250 on a 250-pixel grid. The
+			# exclusions follow the sink/toilet footprints in the original PNG.
+			var scale_to_art = g.SIZE/Vector2(2500,5000)
+			var candidates: Array[int] = []
+			for r in 15:
+				for c in 10:
+					if (r+c)%2 != 0: continue
+					if r >= 6 and r <= 9 and c >= 7: continue
+					if r >= 11 and r <= 13 and c >= 3 and c <= 5: continue
+					if r == 14 and c >= 2 and c <= 6: continue
+					var center = Vector2(c*250+125,1250+r*250+125)*scale_to_art
+					g.add_piece("Tile_Level21",center,Vector2(250,250)*scale_to_art,"move")
+					if r >= 1 and r <= 8 and c >= 1 and c <= 5: candidates.append(g.pieces.size()-1)
+			var p = g.pieces[candidates.pick_random()]
+			p.target += Vector2(35,0)
+			p.pos = p.target
+			p.faults = 1
+			return
 		22:
 			g.prompt = "DRAG INTO BOOK ORDER!"
 			var widths = [200,250,150,220,300,170,270]
@@ -95,8 +117,8 @@ static func build(g, id: int) -> void:
 	# Tight repeated layouts move vertically to keep every hit target accessible.
 	for p in g.pieces:
 		if p.faults == 0: continue
-		if id in [15,17,21]:
-			p.target = p.home + Vector2(0,-minf(100,p.size.y*0.22))
+		if id == 17:
+			p.target = p.home + Vector2(0,-minf(40,p.size.y*0.08))
 			p.pos = p.target
 		elif id == 7:
 			p.target = p.home+Vector2(0,170)

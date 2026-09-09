@@ -33,14 +33,14 @@ func reset() -> void:
 func scatter_bushes() -> void:
 	var indices = range(game.pieces.size())
 	indices.shuffle()
-	var loose_positions = [Vector2(420,800),Vector2(2080,800),Vector2(1250,4250)]
-	loose_positions.shuffle()
-	for i in randi_range(1,3):
-		var p = game.pieces[indices[i]]
-		p.slot = -1
-		p.faults = 1
-		p.pos = loose_positions[i]
-		p.target = p.pos
+	# One bush slightly exposes its own baseplate; it stays on the lawn
+	# beside that circle instead of being scattered elsewhere in the park.
+	var p = game.pieces[indices[0]]
+	p.slot = -1
+	p.faults = 1
+	var direction = Vector2(1 if p.home.x < game.SIZE.x/2 else -1,randf_range(-0.35,0.35)).normalized()
+	p.pos = p.home + direction*randf_range(90,120)
+	p.target = p.pos
 
 func setup_order(left: float, gap: float) -> void:
 	order_left = left
@@ -136,7 +136,7 @@ func tap_hex(point: Vector2) -> bool:
 
 func pointer_down(point: Vector2, pointer: int) -> void:
 	if held >= 0: return
-	if game.state != "play" or game.paused or (point.y < 210 and point.x > 2090):
+	if game.state != "play" or game.paused or (point.y < 310 and point.x > 2090):
 		game.tap(point)
 		return
 	var front_to_back: Array = game.drawing_order()
@@ -240,12 +240,7 @@ func cancel() -> void:
 func draw_drag() -> void:
 	if held < 0: return
 	var p = game.pieces[held]
-	if moved and hover >= 0:
-		if p.mode == "place":
-			game.draw_arc(planting_spots[hover],260,0,TAU,48,game.YELLOW,15,true)
-		else:
-			game.draw_rect(Rect2(p.target-p.size/2,p.size).grow(20),Color(1,0.97,0.4,0.6),false,12)
 	game.draw_set_transform(p.pos,deg_to_rad(p.angle))
-	game.draw_texture_rect(game.tex(p.name),Rect2(-p.size/2+Vector2(22,28),p.size),false,Color(0,0,0,0.22))
+	game.draw_texture_rect(game.tex(p.name),Rect2(-p.size/2+Vector2(12,18),p.size),false,Color(0,0,0,0.12))
 	game.picture(p.name,Rect2(-p.size/2,p.size))
 	game.draw_set_transform(Vector2.ZERO)

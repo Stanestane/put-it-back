@@ -3,10 +3,13 @@ extends Node2D
 const SIZE = Vector2(2501, 5001)
 const INK = Color("2d3446")
 const CREAM = Color("efe9d9")
-const PINK = Color("f26494")
+const PINK = Color("b56b60")
+const TEAL = Color("203e43")
+const SUCCESS = Color("31594a")
+const RETRY = Color("87473d")
 const YELLOW = Color("fff869")
-const LEVELS = [1,2,3,103,4,5,6,7,8,9,10,12,13,14,114,15,16,17,18,19,20,120,21,22]
-const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",103:"Plate sizes",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brickwork",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf"}
+const LEVELS = [1,2,3,4,5,6,7,8,9,10,12,13,14,114,15,16,17,18,19,20,120,21,22]
+const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brickwork",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf"}
 const ExtraLevels = preload("res://scripts/extra_levels.gd")
 const PuzzleInteraction = preload("res://scripts/puzzle_interaction.gd")
 const PuzzleTests = preload("res://scripts/puzzle_tests.gd")
@@ -98,7 +101,8 @@ func disturb(count: int = 0) -> void:
 	for i in pieces.size():
 		if pieces[i].mode != "static": candidates.append(i)
 	candidates.shuffle()
-	var total = mini(count if count > 0 else randi_range(1,3), candidates.size())
+	var budget = 1 if candidates.size() <= 3 else randi_range(1,2)
+	var total = mini(count if count > 0 else budget, candidates.size())
 	for i in total:
 		var p = pieces[candidates[i]]
 		p.faults = 1
@@ -106,10 +110,13 @@ func disturb(count: int = 0) -> void:
 			p.rotation_target = p.goal - p.step
 			p.angle = p.rotation_target
 		else:
-			p.target = p.home + Vector2(randf_range(115,230) * [-1,1].pick_random(),0)
+			var offset = clampf(p.size.x*0.08,30.0,90.0)*randf_range(0.8,1.2)
+			p.target = p.home + Vector2(offset * [-1,1].pick_random(),0)
 			p.pos = p.target
 
 func start_round(id: int = -1) -> void:
+	# Legacy practice shortcuts cannot reopen the removed size-ordering puzzle.
+	if id >= 0 and id not in LEVELS: id = 3 if id == 103 else LEVELS[0]
 	if id < 0:
 		var choices = LEVELS.duplicate()
 		choices.erase(level)
@@ -128,9 +135,9 @@ func start_round(id: int = -1) -> void:
 			art("Fireplace_Level1",400,2409,1701,1401,"move")
 			var p = art("Picture_Level1",400,704,1701,1001,"move")
 			disturb()
-			if randf() < 0.5:
-				p.angle = -8.0
-				p.rotation_target = -8.0
+			if p.faults > 0 and randf() < 0.5:
+				p.angle = -4.0
+				p.rotation_target = -4.0
 				p.faults += 1
 		4:
 			prompt = "CENTRE!"
@@ -284,7 +291,7 @@ func tap(point: Vector2) -> void:
 			practice = true
 			start_round(LEVELS[idx])
 		return
-	if point.y < 210 and point.x > 2090:
+	if point.y < 310 and point.x > 2090:
 		interaction.cancel()
 		paused = not paused
 		return
@@ -299,7 +306,7 @@ func tap(point: Vector2) -> void:
 	front_to_back.reverse()
 	for i in front_to_back:
 		var p = pieces[i]
-		if not p.mode in ["move","rotate","face"]: continue
+		if not p.mode in ["move","rotate","face","mirror"]: continue
 		if p.get("stack",false):
 			if not stack_hit(p,point): continue
 			# A correctly placed visible surface blocks taps on plates below it.
@@ -309,7 +316,10 @@ func tap(point: Vector2) -> void:
 			var local = (point-p.pos).rotated(-deg_to_rad(p.angle))
 			var margin = minf(65.0,p.size.x*0.15) if not level in [12,14,114,17,19,21] else 0.0
 			if not Rect2(-p.size/2-Vector2.ONE*margin,p.size+Vector2.ONE*margin*2).has_point(local): continue
-		if p.mode == "face":
+		if p.mode == "mirror":
+			p.flip_h = false
+			p.faults = 0
+		elif p.mode == "face":
 			p.name = p.correct_name
 			p.faults = 0
 		elif p.mode == "rotate":
@@ -442,6 +452,18 @@ func text_in_box(value: String, rect: Rect2, size_px: int, color: Color) -> void
 	var baseline = rect.get_center().y+(font.get_ascent(size_px)-font.get_descent(size_px))/2
 	draw_string(font,Vector2(rect.get_center().x-width/2,baseline),value,HORIZONTAL_ALIGNMENT_LEFT,-1,size_px,color)
 
+func caption(value: String, center_y: float, size_px: int, color: Color) -> void:
+	# An opaque warm-ivory surface keeps Cooper readable on every scene, without
+	# font outlines, neon colors, or guessing the colors behind each glyph.
+	var width = minf(SIZE.x-180,font.get_string_size(value,HORIZONTAL_ALIGNMENT_LEFT,-1,size_px).x+160)
+	var height = font.get_height(size_px)+80
+	var rect = Rect2((SIZE.x-width)/2,center_y-height/2,width,height)
+	var style = StyleBoxFlat.new()
+	style.bg_color = CREAM
+	style.set_corner_radius_all(55)
+	draw_style_box(style,rect)
+	text_in_box(value,rect,size_px,color)
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO,SIZE),CREAM)
 	if state == "splash":
@@ -449,23 +471,23 @@ func _draw() -> void:
 		draw_set_transform(Vector2(1250.5,995.3),splash_angle+sin(elapsed*1.6)*0.008)
 		picture("Picture_Splash_Screen",Rect2(-780.5,-175.3,1561,1753))
 		draw_set_transform(Vector2.ZERO)
-		label("PUT IT BACK",520,240,PINK)
+		label("PUT IT BACK",520,240,TEAL)
 		var play_rect = Rect2(740.5,3229,1020,442)
 		var play_style = StyleBoxFlat.new()
 		play_style.bg_color = CREAM
-		play_style.border_color = PINK
+		play_style.border_color = TEAL
 		play_style.set_border_width_all(18)
 		play_style.set_corner_radius_all(210)
 		draw_style_box(play_style,play_rect)
-		text_in_box("Play",play_rect,270,PINK)
-		label("5 SECONDS. FIX THE SCENE.",4050,110)
-		label("CHOOSE LEVEL",4490,135)
-		label("BEST STREAK  %d" % best,4720,90)
-		if ads != null and ads.privacy_required(): label("Privacy options",4930,90)
+		text_in_box("Play",play_rect,270,TEAL)
+		label("5 SECONDS. FIX THE SCENE.",4050,110,TEAL)
+		label("CHOOSE LEVEL",4490,135,TEAL)
+		label("BEST STREAK  %d" % best,4720,90,TEAL)
+		if ads != null and ads.privacy_required(): label("Privacy options",4930,90,TEAL)
 		return
 	if state == "select":
 		draw_rect(Rect2(Vector2.ZERO,SIZE),INK)
-		label("CHOOSE LEVEL",370,200,YELLOW)
+		label("CHOOSE LEVEL",370,200,CREAM)
 		for i in LEVELS.size():
 			var box = Rect2(100+(i%2)*1150,600+int(i/2)*330,1100,285)
 			draw_style_box(menu_style(),box)
@@ -478,21 +500,25 @@ func _draw() -> void:
 	for i in drawing_order():
 		if i == interaction.held: continue
 		var p = pieces[i]
-		draw_set_transform(p.pos,deg_to_rad(p.angle))
+		draw_set_transform(p.pos,deg_to_rad(p.angle),Vector2(-1 if p.get("flip_h",false) else 1,1))
 		picture(p.name,Rect2(-p.size/2,p.size))
 	draw_set_transform(Vector2.ZERO)
 	interaction.draw_drag()
 	draw_rect(Rect2(0,0,SIZE.x,120),INK)
 	draw_rect(Rect2(25,25,(SIZE.x-50)*remaining/5.0,65),PINK if remaining < 1.7 else CREAM)
-	draw_string(font,Vector2(2190,210),"II",HORIZONTAL_ALIGNMENT_LEFT,-1,110,INK)
-	if state == "play" and remaining > 4.15: label(prompt,440,210,YELLOW)
-	if state == "win": label("GREAT!",2650,430,YELLOW)
+	var pause_style = StyleBoxFlat.new()
+	pause_style.bg_color = CREAM
+	pause_style.set_corner_radius_all(35)
+	draw_style_box(pause_style,Rect2(2140,140,250,150))
+	text_in_box("II",Rect2(2140,140,250,150),105,TEAL)
+	if state == "play" and remaining > 4.15: caption(prompt,430,145,TEAL)
+	if state == "win": caption("GREAT!",2500,300,SUCCESS)
 	if state == "lose":
 		draw_rect(Rect2(Vector2.ZERO,SIZE),Color(0,0,0,0.25))
-		label("TRY AGAIN!",2650,260,PINK)
+		caption("TRY AGAIN!",2500,240,RETRY)
 	if paused:
 		draw_rect(Rect2(Vector2.ZERO,SIZE),Color(0.1,0.12,0.17,0.88))
-		label("PAUSED",2300,300,YELLOW)
+		label("PAUSED",2300,300,CREAM)
 		label("Tap II to resume",2550,120)
 		label("Tap below for menu",2900,120)
 
@@ -504,6 +530,9 @@ func menu_style() -> StyleBoxFlat:
 
 func self_test() -> void:
 	if not await preload("res://scripts/ads/ad_tests.gd").new().run(self):
+		get_tree().quit(1)
+		return
+	if not preload("res://scripts/aesthetic_tests.gd").new().run(self):
 		get_tree().quit(1)
 		return
 	# Exercise real hit testing and completion for every generated puzzle.
@@ -521,7 +550,7 @@ func self_test() -> void:
 					get_tree().quit(1)
 					return
 				continue
-			if id in [3,103,20,120]:
+			if id in [3,20,120]:
 				var suite = StackTests.new(self,repetition%2 == 0)
 				if not suite.run_round(id):
 					get_tree().quit(1)
@@ -540,7 +569,7 @@ func self_test() -> void:
 		start_round(id)
 		_process(5.01)
 		assert(state == "lose")
-	print("SELF TEST PASSED: %d levels, 20 randomized solves each, all timeouts; mouse/touch ordering, placement, swaps, plate sizes, cookie facing, horizontal stack faults, invalid drops, cancellation, and pointer ownership" % LEVELS.size())
+	print("SELF TEST PASSED: %d levels, 20 randomized solves each, all timeouts; mouse/touch ordering, placement, swaps, subtle imperfections, cookie facing, horizontal stack faults, invalid drops, cancellation, and pointer ownership" % LEVELS.size())
 	get_tree().quit()
 
 func capture_gallery() -> void:
@@ -552,5 +581,27 @@ func capture_gallery() -> void:
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/level_%d.png" % id)
+	for id in [5,10,22]:
+		start_round(id)
+		remaining = 4.0
+		for p in pieces:
+			if p.faults <= 0: continue
+			interaction.pointer_down(p.pos,-1)
+			interaction.pointer_move(p.pos+Vector2(120,80),-1)
+			break
+		queue_redraw()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("res://verification/drag_%d.png" % id)
+	for id in [15,21]:
+		start_round(id)
+		remaining = 4.0
+		for p in pieces:
+			p.pos = p.home
+			p.target = p.home
+			p.flip_h = false
+			p.faults = 0
+		queue_redraw()
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("res://verification/solved_%d.png" % id)
 	print("GALLERY CAPTURED")
 	get_tree().quit()

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ads/ad_settings.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+enabled = true
+rounds_between_ads = 10
+minimum_gameplay_seconds = 90.0
+show_in_practice = false
+test_ads = true
+production_interstitial_id = ""
+general_audience_confirmed = false

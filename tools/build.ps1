@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $godotEngine = 'D:/Godot/Engine/Godot_v4.7.2-stable_win64_console.exe'
 Set-Location -LiteralPath $projectRoot
+& "$PSScriptRoot/setup-android.ps1"
 New-Item -ItemType Directory -Force exports/windows,exports/android,verification | Out-Null
 Set-Content -LiteralPath verification/.gdignore -Value ''
 Set-Content -LiteralPath exports/.gdignore -Value ''
@@ -16,6 +17,7 @@ function Invoke-GodotChecked([string[]]$Arguments, [string]$Log) {
     Write-Output "Passed: $Log"
 }
 Invoke-GodotChecked @('--headless','--path','.','--editor','--import','--quit') 'verification/import.log'
+Invoke-GodotChecked @('--headless','--path','.','--script','tools/check_ads.gd') 'verification/ads-parser.log'
 Invoke-GodotChecked @('--headless','--path','.','--quit-after','300','--','--self-test') 'verification/tests.log'
 if (-not (Select-String -Path verification/tests.log -Pattern 'SELF TEST PASSED')) { throw 'Test success marker missing' }
 Invoke-GodotChecked @('--path','.','--rendering-method','gl_compatibility','--audio-driver','Dummy','--','--gallery') 'verification/gallery.log'

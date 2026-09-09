@@ -46,3 +46,7 @@ Desktop.ini
 /android/**/*.import
 npm-debug.log
 yarn-error.log
+
+# Generated Godot Gradle template (original Capacitor sources remain tracked)
+/android/build/
+/android/.build_version

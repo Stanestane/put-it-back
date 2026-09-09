@@ -11,6 +11,11 @@ const ExtraLevels = preload("res://scripts/extra_levels.gd")
 const PuzzleInteraction = preload("res://scripts/puzzle_interaction.gd")
 const PuzzleTests = preload("res://scripts/puzzle_tests.gd")
 const StackTests = preload("res://scripts/stack_tests.gd")
+const AdManager = preload("res://scripts/ads/ad_manager.gd")
+@export var ad_settings: Resource = preload("res://resources/ads_settings.tres")
+var ads
+var app_foreground = true
+var resume_after_ad = false
 var interaction
 var textures: Dictionary = {}
 var hit_images: Dictionary = {}
@@ -46,6 +51,12 @@ func _ready() -> void:
 	if "--gallery" in OS.get_cmdline_user_args():
 		testing = true
 		call_deferred("capture_gallery")
+
+	if not testing:
+		ads = AdManager.new()
+		add_child(ads)
+		ads.break_finished.connect(_on_ad_break_finished)
+		ads.configure(ad_settings)
 
 func tex(name: String) -> Texture2D:
 	if not textures.has(name):
@@ -254,8 +265,11 @@ func solve_ribbons(grid: Array, budget: Array) -> bool:
 	return false
 
 func tap(point: Vector2) -> void:
+	if ads != null and ads.busy: return
 	if state == "splash":
-		if Rect2(650,3190,1200,650).has_point(point):
+		if ads != null and ads.privacy_required() and Rect2(650,4800,1200,200).has_point(point):
+			ads.show_privacy()
+		elif Rect2(650,3190,1200,650).has_point(point):
 			practice = false
 			score = 0
 			start_round()
@@ -317,6 +331,8 @@ func solved() -> bool:
 	return true
 
 func finish(won: bool) -> void:
+	if state != "play": return
+	if ads != null and not testing: ads.complete_round(practice)
 	interaction.cancel()
 	state = "win" if won else "lose"
 	phase = 1.1 if won else 0.5
@@ -330,6 +346,7 @@ func finish(won: bool) -> void:
 	else: score = 0
 
 func _input(event: InputEvent) -> void:
+	if not app_foreground or state == "ad" or (ads != null and ads.busy): return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		interaction.cancel()
 		if state == "select": state = "splash"
@@ -347,16 +364,38 @@ func _input(event: InputEvent) -> void:
 		interaction.pointer_move(event.position/scale,event.index)
 
 func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT]:
+		app_foreground = false
+	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		app_foreground = true
 	if interaction == null: return
-	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT] and state in ["play","win","lose"]:
+	if not app_foreground:
 		interaction.cancel()
-		paused = true
+		if state in ["play","win","lose"] and not (ads != null and ads.busy): paused = true
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if state == "ad" or (ads != null and ads.busy): return
 		interaction.cancel()
 		if state == "select": state = "splash"
 		elif state != "splash": paused = not paused
 
+func _advance_after_result() -> void:
+	state = "ad"
+	if ads != null and ads.between_rounds(practice): return
+	start_round(level if practice else -1)
+
+func _on_ad_break_finished() -> void:
+	if state == "ad": resume_after_ad = true
+
 func _process(dt: float) -> void:
+	if not app_foreground: return
+	if ads != null:
+		if state == "splash": ads.show_menu_consent()
+		if ads.busy: return
+	if resume_after_ad:
+		resume_after_ad = false
+		start_round(level if practice else -1)
+		queue_redraw()
+		return
 	if paused:
 		queue_redraw()
 		return
@@ -366,11 +405,12 @@ func _process(dt: float) -> void:
 		if i != interaction.held: p.pos = p.pos.lerp(p.target,1.0-exp(-8.0*dt))
 		p.angle = lerpf(p.angle,p.rotation_target,1.0-exp(-8.0*dt))
 	if state == "play":
+		if ads != null: ads.tick_gameplay(minf(dt,remaining),practice)
 		remaining = maxf(0,remaining-dt)
 		if remaining == 0: finish(false)
 	elif state in ["win","lose"]:
 		phase -= dt
-		if phase <= 0: start_round(level if practice else -1)
+		if phase <= 0: _advance_after_result()
 	queue_redraw()
 
 func label(value: String, y: float, size_px: int = 160, color: Color = CREAM) -> void:
@@ -420,7 +460,8 @@ func _draw() -> void:
 		text_in_box("Play",play_rect,270,PINK)
 		label("5 SECONDS. FIX THE SCENE.",4050,110)
 		label("CHOOSE LEVEL",4490,135)
-		label("BEST STREAK  %d" % best,4800,90)
+		label("BEST STREAK  %d" % best,4720,90)
+		if ads != null and ads.privacy_required(): label("Privacy options",4930,90)
 		return
 	if state == "select":
 		draw_rect(Rect2(Vector2.ZERO,SIZE),INK)
@@ -462,6 +503,9 @@ func menu_style() -> StyleBoxFlat:
 	return style
 
 func self_test() -> void:
+	if not await preload("res://scripts/ads/ad_tests.gd").new().run(self):
+		get_tree().quit(1)
+		return
 	# Exercise real hit testing and completion for every generated puzzle.
 	for id in LEVELS:
 		for repetition in 20:

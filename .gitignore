@@ -38,5 +38,11 @@ Desktop.ini
 
 # Node
 /node_modules
+/.godot/
+/exports/
+/verification/
+/asset_catalog.jpg
+/asset_catalog.jpg.import
+/android/**/*.import
 npm-debug.log
 yarn-error.log

@@ -18,6 +18,6 @@ static func build(g, id: int) -> void:
 		if id == 20:
 			p.name = "Bar2_Level20"
 		else:
-			var magnitude = randf_range(70,115) if plates else randf_range(65,105)
+			var magnitude = randf_range(140,210) if plates else randf_range(120,180)
 			p.target.x += magnitude*[-1,1].pick_random()
 			p.pos = p.target

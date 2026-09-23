@@ -8,8 +8,8 @@ const TEAL = Color("203e43")
 const SUCCESS = Color("31594a")
 const RETRY = Color("87473d")
 const YELLOW = Color("fff869")
-const LEVELS = [1,2,3,4,5,6,7,8,9,10,12,13,14,114,15,16,17,18,19,20,120,21,22]
-const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brickwork",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf"}
+const LEVELS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,114,15,16,17,18,19,20,120,21,22,23,24,25]
+const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",11:"Cakes",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brickwork",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf",23:"Paint tubes",24:"Juice bottles",25:"Drawers"}
 const ExtraLevels = preload("res://scripts/extra_levels.gd")
 const PuzzleInteraction = preload("res://scripts/puzzle_interaction.gd")
 const PuzzleTests = preload("res://scripts/puzzle_tests.gd")
@@ -78,6 +78,15 @@ func add_piece(name: String, center: Vector2, size: Vector2, mode: String = "sta
 func art(name: String, x: float, y: float, w: float, h: float, mode: String = "static") -> Dictionary:
 	return add_piece(name, Vector2(x+w/2,y+h/2), Vector2(w,h), mode)
 
+func set_drawer_depth(p: Dictionary, depth: int) -> void:
+	p.depth = depth
+	p.name = "Drawer%d_Level25" % (depth+1)
+	p.size = Vector2(950+depth*30,550+depth*70)
+	# Keep the back edge in its cabinet opening as the front projects outward.
+	p.target = p.home+Vector2(0,depth*35)
+	p.pos = p.target
+	p.faults = depth
+
 func drawing_order() -> Array:
 	var indices = range(pieces.size())
 	if not pieces.is_empty() and pieces[0].get("stack",false):
@@ -110,7 +119,9 @@ func disturb(count: int = 0) -> void:
 			p.rotation_target = p.goal - p.step
 			p.angle = p.rotation_target
 		else:
-			var offset = clampf(p.size.x*0.08,30.0,90.0)*randf_range(0.8,1.2)
+			# Keep small-object faults visible at the 500-pixel viewport width.
+			var offset = clampf(p.size.x*0.35,110.0,220.0)*randf_range(0.9,1.1)
+			if level == 11: offset = randf_range(100,135)
 			p.target = p.home + Vector2(offset * [-1,1].pick_random(),0)
 			p.pos = p.target
 
@@ -284,12 +295,11 @@ func tap(point: Vector2) -> void:
 		else: splash_angle = -splash_angle*1.1
 		return
 	if state == "select":
-		var col = int((point.x-100)/1150)
-		var row = int((point.y-600)/330)
-		var idx = row*2+col
-		if point.x >= 100 and point.y >= 600 and col >= 0 and col < 2 and idx < LEVELS.size():
-			practice = true
-			start_round(LEVELS[idx])
+		for i in LEVELS.size():
+			if level_button_rect(i).has_point(point):
+				practice = true
+				start_round(LEVELS[i])
+				break
 		return
 	if point.y < 310 and point.x > 2090:
 		interaction.cancel()
@@ -306,7 +316,7 @@ func tap(point: Vector2) -> void:
 	front_to_back.reverse()
 	for i in front_to_back:
 		var p = pieces[i]
-		if not p.mode in ["move","rotate","face","mirror"]: continue
+		if not p.mode in ["move","rotate","face","mirror","close"]: continue
 		if p.get("stack",false):
 			if not stack_hit(p,point): continue
 			# A correctly placed visible surface blocks taps on plates below it.
@@ -316,7 +326,9 @@ func tap(point: Vector2) -> void:
 			var local = (point-p.pos).rotated(-deg_to_rad(p.angle))
 			var margin = minf(65.0,p.size.x*0.15) if not level in [12,14,114,17,19,21] else 0.0
 			if not Rect2(-p.size/2-Vector2.ONE*margin,p.size+Vector2.ONE*margin*2).has_point(local): continue
-		if p.mode == "mirror":
+		if p.mode == "close":
+			set_drawer_depth(p,maxi(0,p.depth-1))
+		elif p.mode == "mirror":
 			p.flip_h = false
 			p.faults = 0
 		elif p.mode == "face":
@@ -489,11 +501,11 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO,SIZE),INK)
 		label("CHOOSE LEVEL",370,200,CREAM)
 		for i in LEVELS.size():
-			var box = Rect2(100+(i%2)*1150,600+int(i/2)*330,1100,285)
+			var box = level_button_rect(i)
 			draw_style_box(menu_style(),box)
 			var title = "%s  %s" % [(str(LEVELS[i]-100)+"b") if LEVELS[i] >= 100 else str(LEVELS[i]),NAMES[LEVELS[i]]]
 			var title_size = mini(100,int(100*1010.0/font.get_string_size(title,HORIZONTAL_ALIGNMENT_LEFT,-1,100).x))
-			draw_string(font,box.position+Vector2(45,185),title,HORIZONTAL_ALIGNMENT_LEFT,-1,title_size,CREAM)
+			text_in_box(title,box,title_size,CREAM)
 		label("Esc / Back to return",4800,90)
 		return
 	if background != "": picture(background,Rect2(Vector2.ZERO,SIZE))
@@ -522,6 +534,11 @@ func _draw() -> void:
 		label("Tap II to resume",2550,120)
 		label("Tap below for menu",2900,120)
 
+func level_button_rect(index: int) -> Rect2:
+	var rows = ceili(LEVELS.size()/2.0)
+	var pitch = minf(330.0,4080.0/rows)
+	return Rect2(100+(index%2)*1150,600+int(index/2)*pitch,1100,pitch-35)
+
 func menu_style() -> StyleBoxFlat:
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color("485467")
@@ -535,6 +552,9 @@ func self_test() -> void:
 	if not preload("res://scripts/aesthetic_tests.gd").new().run(self):
 		get_tree().quit(1)
 		return
+	if not preload("res://scripts/new_levels_tests.gd").new().run(self):
+		get_tree().quit(1)
+		return
 	# Exercise real hit testing and completion for every generated puzzle.
 	for id in LEVELS:
 		for repetition in 20:
@@ -544,7 +564,7 @@ func self_test() -> void:
 				push_error("Round starts solved: %d" % id)
 				get_tree().quit(1)
 				return
-			if id in [5,10,19,22]:
+			if id in [5,10,19,22,23,24]:
 				var suite = PuzzleTests.new(self,repetition%2 == 0)
 				if not suite.run_round(id):
 					get_tree().quit(1)
@@ -581,7 +601,7 @@ func capture_gallery() -> void:
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/level_%d.png" % id)
-	for id in [5,10,22]:
+	for id in [5,10,22,23,24]:
 		start_round(id)
 		remaining = 4.0
 		for p in pieces:
@@ -592,16 +612,24 @@ func capture_gallery() -> void:
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/drag_%d.png" % id)
-	for id in [15,21]:
+	for id in [11,15,21,23,24,25]:
 		start_round(id)
 		remaining = 4.0
 		for p in pieces:
+			if p.mode == "close": set_drawer_depth(p,0)
+			if p.has("correct_name"): p.name = p.correct_name
 			p.pos = p.home
 			p.target = p.home
+			p.angle = p.goal
+			p.rotation_target = p.goal
 			p.flip_h = false
 			p.faults = 0
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/solved_%d.png" % id)
+	state = "select"
+	queue_redraw()
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("res://verification/level_select.png")
 	print("GALLERY CAPTURED")
 	get_tree().quit()

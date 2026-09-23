@@ -5,7 +5,7 @@ func check(ok: bool, message: String) -> void:
 	if not ok and message not in failures: failures.append(message)
 
 func run(game) -> bool:
-	check(game.LEVELS.size() == 23 and 103 not in game.LEVELS,"Removed plate-size level remains selectable")
+	check(103 not in game.LEVELS,"Removed plate-size level remains selectable")
 	for repetition in 50:
 		seed(91000+repetition)
 		for id in [4,7,8,9]:
@@ -16,6 +16,14 @@ func run(game) -> bool:
 				if p.mode != "static": movable += 1
 				if p.faults > 0: displaced += 1
 			if movable == 3: check(displaced == 1,"Three-object scene has multiple imperfections")
+		for id in [1,4,8,11,13]:
+			game.start_round(id)
+			for p in game.pieces:
+				if p.mode != "move" or p.faults == 0: continue
+				var shift = absf(p.pos.x-p.home.x)
+				check(shift >= 85 and shift <= 245,"Horizontal fault is too faint or too large")
+				check(p.pos.y == p.home.y,"Horizontal alignment fault moved vertically")
+				check(Rect2(Vector2.ZERO,game.SIZE).encloses(Rect2(p.pos-p.size/2,p.size)),"Horizontal fault moved artwork off screen")
 		game.start_round(5)
 		for p in game.pieces:
 			if p.faults > 0:
@@ -48,7 +56,7 @@ func run(game) -> bool:
 			check(not (r == 14 and c >= 2 and c <= 6),"Tile overlaps toilet base")
 			if p.faults > 0:
 				faults += 1
-				check(p.pos.distance_to(p.home) <= 40,"Bathroom imperfection is too large")
+				check(p.pos.distance_to(p.home) >= 89 and p.pos.distance_to(p.home) <= 111,"Bathroom imperfection is too faint or too large")
 			else: check(p.pos == p.home,"Correct bathroom tile is displaced")
 		check(faults == 1,"Bathroom must have one displaced tile")
 	for failure in failures: push_error("Aesthetic test: " + failure)

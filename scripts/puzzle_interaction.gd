@@ -6,6 +6,7 @@ var order: Array[int] = []
 var order_left = 0.0
 var order_gap = 0.0
 var order_vertical = false
+var order_grid = false
 var order_top = 0.0
 var order_pitch = 0.0
 var held = -1
@@ -29,6 +30,7 @@ func reset() -> void:
 	planting_spots.clear()
 	slot_centers.clear()
 	order_vertical = false
+	order_grid = false
 
 func scatter_bushes() -> void:
 	var indices = range(game.pieces.size())
@@ -61,6 +63,10 @@ func setup_order(left: float, gap: float) -> void:
 	for i in order: game.pieces[i].pos = game.pieces[i].target
 
 func layout_order(sequence: Array[int]) -> void:
+	if order_grid:
+		for rank in sequence.size():
+			game.pieces[sequence[rank]].target = game.pieces[rank].home
+		return
 	if order_vertical:
 		for rank in sequence.size():
 			var p = game.pieces[sequence[rank]]
@@ -71,6 +77,12 @@ func layout_order(sequence: Array[int]) -> void:
 		var p = game.pieces[i]
 		p.target = Vector2(x+p.size.x/2,p.home.y)
 		x += p.size.x+order_gap
+
+func setup_grid_order() -> void:
+	# Paint tubes occupy two rows; insertion continues from the end of the
+	# first row to the beginning of the second, following the palette colors.
+	order_grid = true
+	setup_order(0.0,0.0)
 
 func setup_vertical_order(top: float, pitch: float) -> void:
 	order_vertical = true
@@ -143,13 +155,13 @@ func pointer_down(point: Vector2, pointer: int) -> void:
 	front_to_back.reverse()
 	for i in front_to_back:
 		var p = game.pieces[i]
-		if not p.mode in ["reorder","place"] or not hit(p,point): continue
+		if not p.mode in ["reorder","place","exchange"] or not hit(p,point): continue
 		if order_vertical and (i == 0 or i == order.size()-1): return
 		held = i
 		owner = pointer
 		grab_offset = point-p.pos
 		press_point = point
-		held_position = p.pos
+		held_position = p.target if p.mode == "exchange" else p.pos
 		moved = false
 		hover = -1
 		slot_centers.clear()
@@ -172,12 +184,50 @@ func pointer_move(point: Vector2, pointer: int) -> void:
 			preview.insert(hover,held)
 			layout_order(preview)
 		else: layout_order(order)
+	elif p.mode == "exchange":
+		hover = bottle_at(p.pos)
 	else:
 		hover = planting_at(p.pos)
 	game.queue_redraw()
 
+func bottle_at(center: Vector2) -> int:
+	var nearest = -1
+	var distance = INF
+	for i in game.pieces.size():
+		if i == held: continue
+		var p = game.pieces[i]
+		if p.mode != "exchange": continue
+		var delta: Vector2 = center-p.target
+		if absf(delta.x) > 140 or absf(delta.y) > 300: continue
+		if delta.length_squared() < distance:
+			distance = delta.length_squared()
+			nearest = i
+	return nearest
+
+func exchange_bottles(first: int, second: int) -> void:
+	var a = game.pieces[first]
+	var b = game.pieces[second]
+	var slot: int = a.slot
+	a.slot = b.slot
+	b.slot = slot
+	for p in [a,b]:
+		p.target = game.pieces[p.slot].home
+		# Bottles of the same flavor are interchangeable.
+		p.faults = int(p.name != game.pieces[p.slot].correct_name)
+
 func insertion_at(center: Vector2) -> int:
 	var p = game.pieces[held]
+	if order_grid:
+		var nearest = -1
+		var distance = INF
+		for rank in order.size():
+			var slot: Vector2 = game.pieces[rank].home
+			var delta = center-slot
+			if absf(delta.x) > 200 or absf(delta.y) > 420: continue
+			if delta.length_squared() < distance:
+				distance = delta.length_squared()
+				nearest = rank
+		return nearest
 	if order_vertical:
 		if absf(center.x-p.home.x) > 550 or center.y < order_top-order_pitch*0.6 or center.y > slot_centers.back()+order_pitch*0.6:
 			return -1
@@ -217,6 +267,8 @@ func pointer_up(point: Vector2, pointer: int) -> void:
 			order.insert(hover,held)
 			layout_order(order)
 			refresh_order_faults()
+		elif p.mode == "exchange":
+			exchange_bottles(held,hover)
 		else:
 			p.slot = hover
 			p.target = planting_spots[hover]

@@ -1,6 +1,6 @@
 extends RefCounted
 const Stacks = preload("res://scripts/stack_puzzles.gd")
-## Additional scenes composed from all fourteen Corel ZIP exports.
+## Additional scenes composed from the supplied PNG exports.
 static func build(g, id: int) -> void:
 	match id:
 		2:
@@ -43,6 +43,15 @@ static func build(g, id: int) -> void:
 			g.prompt = "DRAG INTO COLOR ORDER!"
 			for i in 12: g.art("Pencil%d_Level10" % (i+1),415+i*140,280,90,2053,"reorder")
 			g.interaction.setup_order(415.0,50.0)
+			return
+		11:
+			g.prompt = "CENTER THE CAKE!"
+			for r in 2:
+				for c in 2:
+					var center = Vector2(650+c*1200,1750+r*1500)
+					g.add_piece("Plate_Level11",center,Vector2(1000,1000))
+					g.add_piece("Cake_Level11",center,Vector2(700,700),"move")
+			g.disturb(1)
 			return
 		12:
 			g.prompt = "COMPLETE THE PATTERN!"
@@ -98,7 +107,7 @@ static func build(g, id: int) -> void:
 					g.add_piece("Tile_Level21",center,Vector2(250,250)*scale_to_art,"move")
 					if r >= 1 and r <= 8 and c >= 1 and c <= 5: candidates.append(g.pieces.size()-1)
 			var p = g.pieces[candidates.pick_random()]
-			p.target += Vector2(35,0)
+			p.target += Vector2(randf_range(90,110),0)
 			p.pos = p.target
 			p.faults = 1
 			return
@@ -112,6 +121,43 @@ static func build(g, id: int) -> void:
 				x += widths[i]*0.8+20
 			g.art("Plant_Level22",1460,3800-1256,900,1256)
 			g.interaction.setup_order(220.0,20.0)
+			return
+		23:
+			g.prompt = "DRAG INTO COLOR ORDER!"
+			# Match the two rows of six silhouettes in the original tray.
+			for r in 2:
+				for c in 6:
+					g.add_piece("Paint%d_Level23" % (r*6+c+1),Vector2(375+c*350,1060+r*1300),Vector2(300,1140),"reorder")
+			g.interaction.setup_grid_order()
+			return
+		24:
+			g.prompt = "DRAG TO SWAP BOTTLES!"
+			# Each side of the fridge carries one flavor on all four shelves.
+			for r in 4:
+				for side in 2:
+					for c in 3:
+						var name = "Juice%d_Level24" % (side+1)
+						var p = g.add_piece(name,Vector2(515+side*870+c*300,1390+r*730),Vector2(200,610),"exchange")
+						p.correct_name = name
+						p.slot = g.pieces.size()-1
+			var left = randi_range(0,3)*6+randi_range(0,2)
+			var right = randi_range(0,3)*6+3+randi_range(0,2)
+			g.interaction.exchange_bottles(left,right)
+			for p in g.pieces: p.pos = p.target
+			return
+		25:
+			g.prompt = "CLOSE THE DRAWERS!"
+			g.art("Cabinet_Top_Level25",150,1400,2200,900)
+			g.art("Cabinet_Middle_Level25",150,2300,2200,650)
+			g.art("Cabinet_Bottom_Level25",150,2950,2200,950)
+			for r in 3:
+				for c in 2:
+					var p = g.add_piece("Drawer1_Level25",Vector2(725+c*1050,2025+r*650),Vector2(950,550),"close")
+					p.depth = 0
+			var drawers = range(3,g.pieces.size())
+			drawers.shuffle()
+			for i in randi_range(1,2):
+				g.set_drawer_depth(g.pieces[drawers[i]],randi_range(1,2))
 			return
 	g.disturb()
 	# Tight repeated layouts move vertically to keep every hit target accessible.

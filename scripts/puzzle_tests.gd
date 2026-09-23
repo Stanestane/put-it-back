@@ -56,6 +56,9 @@ func drag(index: int, destination: Vector2) -> void:
 	settle()
 
 func rank_drop(index: int, rank: int) -> void:
+	if game.interaction.order_grid:
+		drag(index,game.pieces[rank].home)
+		return
 	var target_item = game.interaction.order[rank]
 	drag(index,Vector2(game.pieces[target_item].target.x,game.pieces[index].home.y))
 
@@ -107,7 +110,10 @@ func test_order() -> void:
 	check(misplaced >= 0,"Ordering puzzle cannot be solved in one insertion")
 	if misplaced < 0: return
 	var p = game.pieces[misplaced]
-	check(p.pos.y == p.home.y,"Item was vertically displaced instead of reordered")
+	if game.interaction.order_grid:
+		check(p.pos == game.pieces[before.find(misplaced)].home,"Tube is not in a tray slot")
+	else:
+		check(p.pos.y == p.home.y,"Item was vertically displaced instead of reordered")
 	click(p.pos)
 	check(game.interaction.order == before and not game.solved(),"Tap auto-fixed drag puzzle")
 	drag(misplaced,Vector2(1250,4700))
@@ -188,11 +194,73 @@ func test_hex() -> void:
 			taps += 1
 	check(taps == broken/2 and game.solved() and game.state == "win","Hex ordering did not solve within 1–3 taps")
 
+func bottle_slots() -> Array:
+	var slots = []
+	for p in game.pieces: slots.append(p.slot)
+	return slots
+
+func test_bottles() -> void:
+	check(game.pieces.size() == 24,"Expected 24 bottles")
+	check(fault_count() == 2,"Exactly two bottles must start exchanged")
+	var wrong: Array[int] = []
+	var lemons = 0
+	for i in game.pieces.size():
+		var p = game.pieces[i]
+		if p.name == "Juice1_Level24": lemons += 1
+		if p.faults > 0: wrong.append(i)
+		check(p.target == game.pieces[p.slot].home,"Bottle is not in a shelf slot")
+	check(lemons == 12,"Swapping changed the number of each flavor")
+	if wrong.size() != 2: return
+	var first = wrong[0]
+	var second = wrong[1]
+	var p = game.pieces[first]
+	check(p.slot == second and game.pieces[second].slot == first,"Initial bottles were not exchanged")
+	var before = bottle_slots()
+	# Grabbing a bottle during its slide must not turn the intermediate
+	# animation position into a permanent shelf slot when released.
+	var shelf: Vector2 = p.target
+	p.pos += Vector2(50,0)
+	click(p.pos)
+	check(p.target == shelf,"Tap during animation moved the bottle's shelf slot")
+	settle()
+	check(bottle_slots() == before and not game.solved(),"Tap auto-fixed bottle puzzle")
+	drag(first,Vector2(50,4700))
+	check(bottle_slots() == before,"Off-shelf drop changed bottles")
+	exercise_cancel(first)
+	check(bottle_slots() == before,"Canceled drag exchanged bottles")
+	# A wrong swap must move both bottles and remain playable.
+	var other = -1
+	for i in game.pieces.size():
+		if i != second and game.pieces[i].name != p.name:
+			other = i
+			break
+	var destination: Vector2 = game.pieces[other].target
+	var origin: Vector2 = p.target
+	drag(first,destination)
+	check(p.target == destination and game.pieces[other].target == origin,"Drop did not exchange both positions")
+	check(game.state == "play" and not game.solved(),"Wrong swap won the round")
+	drag(first,game.pieces[other].target)
+	check(bottle_slots() == before,"Reverse swap failed")
+	# Identical bottles can trade slots without creating a false fault.
+	var same: Array[int] = []
+	for i in game.pieces.size():
+		if game.pieces[i].faults == 0 and game.pieces[i].name == p.name: same.append(i)
+	drag(same[0],game.pieces[same[1]].target)
+	check(fault_count() == 2,"Exchanging identical flavors created a fault")
+	drag(first,game.pieces[second].target)
+	check(game.state == "win" and game.solved(),"Correct bottle swap did not win")
+	var occupied = {}
+	for bottle in game.pieces:
+		occupied[bottle.slot] = true
+		check(bottle.name == game.pieces[bottle.slot].correct_name,"Solved shelf has the wrong flavor")
+	check(occupied.size() == 24,"Two bottles occupy the same slot")
+
 func run_round(id: int) -> bool:
 	match id:
 		5: test_garden()
-		10,22: test_order()
+		10,22,23: test_order()
 		19: test_hex()
+		24: test_bottles()
 	if id != 19:
 		game.start_round(id)
 		var index = 0

@@ -40,6 +40,7 @@ func test_alignment(id: int) -> void:
 			input.check(p.name == ("Plate_Level3" if id == 3 else "Bar1_Level20"),"Alignment puzzle changed artwork facing")
 			input.check((p.pos.x != p.home.x) == (p.faults > 0),"Fault is not a horizontal offset")
 			input.check(absf(p.pos.x-p.home.x) <= 280,"Offset moved the object off the stack")
+			if p.faults > 0: input.check(absf(p.pos.x-p.home.x) >= 120,"Stack offset is barely visible")
 		if p.faults == 0:
 			input.click(visible_point(i))
 			input.check(input.fault_count() == faults,"Tap passed through a correct visible stack surface")

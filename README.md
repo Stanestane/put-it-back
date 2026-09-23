@@ -2,7 +2,7 @@
 
 Native Godot 4.7.2 portrait microgames, ported from the original HTML canvas / Capacitor project. Open `project.godot` and press F6/F5, or run the Windows executable.
 
-Fix each scene within five seconds. Tap puzzles use a click or tap; books, pencils, and the garden use dragging with a mouse or one finger. Success and timeout both advance automatically. The main menu's **Choose Level** starts repeating practice rounds. Use **II**, Escape, or Android Back to pause; tap below the pause text to return to the menu. Best streak is saved locally. Touch and mouse use the same logical coordinates; portrait artwork is preserved with letterboxing.
+Fix each scene within five seconds. Tap puzzles use a click or tap; books, pencils, paint tubes, juice bottles, and the garden use dragging with a mouse or one finger. Success and timeout both advance automatically. The main menu's **Choose Level** starts repeating practice rounds. Use **II**, Escape, or Android Back to pause; tap below the pause text to return to the menu. Best streak is saved locally. Touch and mouse use the same logical coordinates; portrait artwork is preserved with letterboxing.
 
 - **Hexagons (19):** repeating solid-color rows form recognizable stripes. One to three disjoint pairs of neighboring tiles start exchanged. Tap either misplaced tile to exchange it with its neighbor and repair the stripe. Correct tiles stay unchanged.
 - **Pencils (10) and books (22):** one item starts inserted out of order. Drag it to the appropriate position in the color sequence or book sequence. Items between its old and new positions shift; the surrounding objects preview the insertion without a yellow highlight. Valid incorrect insertions remain incorrect, while drops outside the row return the item to its previous position.
@@ -19,7 +19,18 @@ Fix each scene within five seconds. Tap puzzles use a click or tap; books, penci
 
 All game inscriptions use the bundled Cooper Bold (`assets/fonts/COOPERB.TTF`), extracted from `Corel/COOPERB.zip`. Text has no outlines. The Play label and elevator numerals are drawn with this font instead of using the lettering baked into the original sprites.
 
-There are 23 playable variants. The eight original variants remain: fireplace, tower windows, drawer handles, building windows, ribbon tiles, circle tiles, road manhole, and pills. The additional puzzles use the PNG sprites extracted from every supplied Corel ZIP: elevator buttons (2), plates (3), garden (5), junction cover (6), switches (7), tools (9), pencils (10), ceramics (12), brickwork (15), parquet (17), hexagons (19), cookies (20 and 20b), bathroom tiles (21), and bookshelf (22). Original level numbers are preserved; no level 11 artwork was supplied. The circle and cookie-shift variants use internal IDs 114 and 120. Plate-size ordering (103) has been removed.
+There are 27 playable variants. The eight original variants remain: fireplace, tower windows, drawer handles, building windows, ribbon tiles, circle tiles, road manhole, and pills. The additional puzzles use the supplied PNG sprites: elevator buttons (2), plates (3), garden (5), junction cover (6), switches (7), tools (9), pencils (10), cakes (11), ceramics (12), brickwork (15), parquet (17), hexagons (19), cookies (20 and 20b), bathroom tiles (21), bookshelf (22), paint tubes (23), juice bottles (24), and drawers (25). Original level numbers are preserved. The circle and cookie-shift variants use internal IDs 114 and 120. Plate-size ordering (103) has been removed.
+
+The September art packs add four puzzles, available in both random play and the level picker:
+
+- **Cakes (11):** tap the single off-center cake to center it on its plate.
+- **Paint tubes (23):** drag a displaced tube into color order, reading left to right across the top row, then the bottom row. The palette supplies the color sequence: white, yellow, orange, red, pink, purple, blue, cyan, light green, dark green, brown, black. Other tubes shift to preview the insertion, including across rows. One correct insertion solves the round; incorrect insertions remain playable, and drops outside the tray return to the previous order.
+- **Juice bottles (24):** two opposite flavors start with their positions exchanged. Drag one bottle onto the other to swap them back: lemon on the left, grape on the right. Any pair can be swapped; identical flavors are interchangeable, incorrect swaps remain playable, and drops outside a bottle return to the original slot.
+- **Drawers (25):** tap the one or two open drawers to close them. A fully open drawer takes two taps, passing through the partly open sprite.
+
+`scripts/new_levels_tests.gd` verifies menu reachability, the new artwork, mouse/touch input, cross-row paint insertion, bottle exchanges, drawer opening depths, and timeout behavior. Gallery captures include the expanded picker, paint and bottle drag previews, and solved versions of the new scenes.
+
+Version 1.3.1 increases horizontal alignment faults for the lighthouse, house windows, drawer handles, fireplace, cakes, bathroom tiles, and plate/cookie stacks. Small objects shift roughly 20–25 pixels at the 500-pixel game width; larger objects shift farther, while cakes stay on their plates. Three-object scenes still have exactly one faulty object.
 
 `scripts/game.gd` owns the native renderer, round state, input, procedural original puzzles, and save data. `scripts/extra_levels.gd` composes the added scenes. `www/` and `android/` retain the original implementation for reference; Godot does not embed a web browser or use Capacitor. `Corel/` retains all original archives and drawing sources and remains Git-ignored as before. Extracted PNGs in `assets/new/` are included in the repository working tree.
 

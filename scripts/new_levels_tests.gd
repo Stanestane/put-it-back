@@ -6,7 +6,7 @@ func check(ok: bool, message: String) -> void:
 	if not ok and message not in failures: failures.append(message)
 
 func run(game) -> bool:
-	check(game.LEVELS.size() == 27,"Expected 27 playable variants")
+	check(game.LEVELS.size() == 28,"Expected 28 playable variants")
 	for i in game.LEVELS.size():
 		var rect: Rect2 = game.level_button_rect(i)
 		check(rect.end.y < 4750,"Level picker overlaps its footer")
@@ -14,10 +14,23 @@ func run(game) -> bool:
 		var input = preload("res://scripts/puzzle_tests.gd").new(game,i%2 == 0)
 		input.click(rect.get_center())
 		check(game.level == game.LEVELS[i] and game.state == "play" and game.practice,"Level picker selected the wrong puzzle")
-	for point in [Vector2(1230,700),Vector2(2400,4900),Vector2(1800,4550)]:
+	for point in [Vector2(1230,700),Vector2(2400,4900),Vector2(1800,4700)]:
 		game.state = "select"
 		game.tap(point)
 		check(game.state == "select","Empty menu space selected a level")
+	for touch in [false,true]:
+		game.start_round(25)
+		for p in game.pieces:
+			if p.mode == "close": game.set_drawer_depth(p,0)
+		game.set_drawer_depth(game.pieces[3],2)
+		game.set_drawer_depth(game.pieces[5],1)
+		var input = preload("res://scripts/puzzle_tests.gd").new(game,touch)
+		# The upper drawer's front covers the first 40 pixels of the next row.
+		input.click(Vector2(725,2420))
+		check(game.pieces[3].depth == 1 and game.pieces[5].depth == 1,"Tap passed through the front drawer into the drawer below")
+		input.click(game.pieces[3].pos)
+		input.click(game.pieces[5].pos)
+		check(game.state == "win","Overlapping drawers cannot both be closed")
 	for repetition in 30:
 		for id in [11,23,24,25]:
 			seed(230000+repetition*100+id)

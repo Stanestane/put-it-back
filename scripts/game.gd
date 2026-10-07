@@ -8,8 +8,8 @@ const TEAL = Color("203e43")
 const SUCCESS = Color("31594a")
 const RETRY = Color("87473d")
 const YELLOW = Color("fff869")
-const LEVELS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,114,15,16,17,18,19,20,120,21,22,23,24,25]
-const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",11:"Cakes",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brickwork",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf",23:"Paint tubes",24:"Juice bottles",25:"Drawers"}
+const LEVELS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,114,15,16,17,18,19,20,120,21,22,23,24,25,26]
+const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",11:"Cakes",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brick arch",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf",23:"Paint tubes",24:"Juice bottles",25:"Drawers",26:"Dessert picture"}
 const ExtraLevels = preload("res://scripts/extra_levels.gd")
 const PuzzleInteraction = preload("res://scripts/puzzle_interaction.gd")
 const PuzzleTests = preload("res://scripts/puzzle_tests.gd")
@@ -63,6 +63,15 @@ func _ready() -> void:
 
 func tex(name: String) -> Texture2D:
 	if not textures.has(name):
+		if name.begins_with("DessertTile"):
+			var index = int(name.trim_prefix("DessertTile"))
+			var tile = AtlasTexture.new()
+			tile.atlas = preload("res://assets/new/DessertTable_Reference.jpg")
+			# The complete right-hand panel of the supplied comparison image.
+			tile.region = Rect2(476+(index%4)*107.25,13+int(index/4)*107,107.25,107)
+			tile.filter_clip = true
+			textures[name] = tile
+			return tile
 		var path = "res://www/assets/" + name + ".png"
 		if not ResourceLoader.exists(path):
 			path = "res://assets/new/" + name + ".png"
@@ -92,6 +101,16 @@ func drawing_order() -> Array:
 	if not pieces.is_empty() and pieces[0].get("stack",false):
 		# Render from the bottom of the stack upward, even during insertion drags.
 		indices.sort_custom(func(a, b): return pieces[a].pos.y > pieces[b].pos.y)
+	elif level == 25:
+		# Draw the cabinet first, then drawers from bottom to top. An open
+		# upper drawer projects in front of the row below, not behind it.
+		indices.sort_custom(func(a, b):
+			var first_drawer: bool = pieces[a].mode == "close"
+			var second_drawer: bool = pieces[b].mode == "close"
+			if first_drawer != second_drawer: return not first_drawer
+			if first_drawer and pieces[a].home.y != pieces[b].home.y:
+				return pieces[a].home.y > pieces[b].home.y
+			return a < b)
 	return indices
 
 func stack_hit(p: Dictionary, point: Vector2) -> bool:
@@ -205,6 +224,7 @@ func start_round(id: int = -1) -> void:
 			disturb()
 		_:
 			ExtraLevels.build(self, level)
+	if not testing: Telemetry.start_round(level, practice, fault_count())
 	queue_redraw()
 
 const PAIRS = [["salmon","green"],["orange","green"],["orange","teal"],["green","pink"],["green","red"],["teal","red"],["pink","blue"],["red","blue"],["red","lgreen"],["blue","coral"],["blue","yellow"],["lgreen","yellow"],["coral","grey"],["yellow","grey"],["yellow","peri"]]
@@ -284,8 +304,16 @@ func solve_ribbons(grid: Array, budget: Array) -> bool:
 
 func tap(point: Vector2) -> void:
 	if ads != null and ads.busy: return
+	if state == "usage":
+		if Rect2(350,3400,1800,450).has_point(point):
+			Telemetry.set_collection(not Telemetry.collecting())
+		elif point.y > 4100: state = "splash"
+		queue_redraw()
+		return
 	if state == "splash":
-		if ads != null and ads.privacy_required() and Rect2(650,4800,1200,200).has_point(point):
+		if Rect2(50,4800,1125,200).has_point(point):
+			state = "usage"
+		elif ads != null and ads.privacy_required() and Rect2(1250,4800,1200,200).has_point(point):
 			ads.show_privacy()
 		elif Rect2(650,3190,1200,650).has_point(point):
 			practice = false
@@ -307,26 +335,50 @@ func tap(point: Vector2) -> void:
 		return
 	if paused:
 		if point.y > 2600:
+			if not testing: Telemetry.finish_round("abandoned")
 			state = "splash"
 			paused = false
 		return
 	if state != "play": return
-	if interaction.tap_hex(point): return
+	# Tap actions resolve immediately; drag actions are counted on release.
+	var correct = _tap_puzzle(point)
+	if not testing:
+		# _tap_puzzle defers finish so the winning action is included.
+		Telemetry.action(correct)
+	if solved(): finish(true)
+
+func fault_count() -> int:
+	var count = 0
+	for p in pieces: count += maxi(0, p.faults)
+	return count
+
+func _tap_puzzle(point: Vector2) -> bool:
+	var before = fault_count()
+	if interaction.tap_hex(point): return fault_count() < before
 	var front_to_back = drawing_order()
 	front_to_back.reverse()
 	for i in front_to_back:
 		var p = pieces[i]
 		if not p.mode in ["move","rotate","face","mirror","close"]: continue
-		if p.get("stack",false):
+		if p.mode == "close":
+			if not stack_hit(p,point): continue
+			if p.faults <= 0: return false
+		elif p.get("stack",false):
 			if not stack_hit(p,point): continue
 			# A correctly placed visible surface blocks taps on plates below it.
-			if p.faults <= 0: return
+			if p.faults <= 0: return false
 		else:
 			if p.mode == "move" and p.faults <= 0: continue
 			var local = (point-p.pos).rotated(-deg_to_rad(p.angle))
 			var margin = minf(65.0,p.size.x*0.15) if not level in [12,14,114,17,19,21] else 0.0
 			if not Rect2(-p.size/2-Vector2.ONE*margin,p.size+Vector2.ONE*margin*2).has_point(local): continue
-		if p.mode == "close":
+		var had_fault = p.faults > 0
+		if p.has("arch_row"):
+			for section in pieces:
+				if section.get("arch_row",-1) == p.arch_row:
+					section.target = section.home
+					section.faults = 0
+		elif p.mode == "close":
 			set_drawer_depth(p,maxi(0,p.depth-1))
 		elif p.mode == "mirror":
 			p.flip_h = false
@@ -344,8 +396,9 @@ func tap(point: Vector2) -> void:
 			elif p.rotation_target != p.goal:
 				p.rotation_target = p.goal
 				p.faults -= 1
-		if solved(): finish(true)
-		return
+		# Intermediate rotation steps are useful actions even before the final angle.
+		return had_fault
+	return false
 
 func solved() -> bool:
 	for p in pieces:
@@ -354,6 +407,7 @@ func solved() -> bool:
 
 func finish(won: bool) -> void:
 	if state != "play": return
+	if not testing: Telemetry.finish_round("win" if won else "timeout")
 	if ads != null and not testing: ads.complete_round(practice)
 	interaction.cancel()
 	state = "win" if won else "lose"
@@ -371,7 +425,7 @@ func _input(event: InputEvent) -> void:
 	if not app_foreground or state == "ad" or (ads != null and ads.busy): return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		interaction.cancel()
-		if state == "select": state = "splash"
+		if state in ["select", "usage"]: state = "splash"
 		elif state != "splash": paused = not paused
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed: interaction.pointer_down(event.position/scale,-1)
@@ -388,8 +442,10 @@ func _input(event: InputEvent) -> void:
 func _notification(what: int) -> void:
 	if what in [NOTIFICATION_APPLICATION_PAUSED,NOTIFICATION_APPLICATION_FOCUS_OUT]:
 		app_foreground = false
-	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		Telemetry.background()
+	elif what in [NOTIFICATION_APPLICATION_FOCUS_IN, NOTIFICATION_APPLICATION_RESUMED]:
 		app_foreground = true
+		Telemetry.foreground()
 	if interaction == null: return
 	if not app_foreground:
 		interaction.cancel()
@@ -397,7 +453,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		if state == "ad" or (ads != null and ads.busy): return
 		interaction.cancel()
-		if state == "select": state = "splash"
+		if state in ["select", "usage"]: state = "splash"
 		elif state != "splash": paused = not paused
 
 func _advance_after_result() -> void:
@@ -410,6 +466,9 @@ func _on_ad_break_finished() -> void:
 
 func _process(dt: float) -> void:
 	if not app_foreground: return
+	if not testing:
+		var playing = state == "play" and not paused and not (ads != null and ads.busy)
+		Telemetry.tick(dt, minf(dt,remaining) if playing else 0.0)
 	if ads != null:
 		if state == "splash": ads.show_menu_consent()
 		if ads.busy: return
@@ -478,6 +537,22 @@ func caption(value: String, center_y: float, size_px: int, color: Color) -> void
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO,SIZE),CREAM)
+	if state == "usage":
+		label("USAGE DATA",650,220,TEAL)
+		label("Help improve the puzzles",1200,130,TEAL)
+		label("Share level results, play time",1580,115,TEAL)
+		label("and ad activity with VD Solution.",1770,110,TEAL)
+		label("Uses a random installation ID.",2080,110,TEAL)
+		label("No name, email or advertising ID.",2270,105,TEAL)
+		label("Optional. Off clears unsent data;",2580,110,TEAL)
+		label("data already sent stays on the server.",2770,100,TEAL)
+		label("Event data is kept for 90 days.",3040,105,TEAL)
+		var button = Rect2(350,3400,1800,450)
+		draw_style_box(menu_style(),button)
+		var title = ("Turn off" if Telemetry.collecting() else "Allow usage data") if Telemetry.available else "Unavailable in this build"
+		text_in_box(title,button,125,CREAM)
+		label("Back",4400,150,TEAL)
+		return
 	if state == "splash":
 		picture("Background_Splash_Screen",Rect2(Vector2.ZERO,SIZE))
 		draw_set_transform(Vector2(1250.5,995.3),splash_angle+sin(elapsed*1.6)*0.008)
@@ -495,7 +570,8 @@ func _draw() -> void:
 		label("5 SECONDS. FIX THE SCENE.",4050,110,TEAL)
 		label("CHOOSE LEVEL",4490,135,TEAL)
 		label("BEST STREAK  %d" % best,4720,90,TEAL)
-		if ads != null and ads.privacy_required(): label("Privacy options",4930,90,TEAL)
+		text_in_box("Usage data: " + ("on" if Telemetry.collecting() else "off"),Rect2(50,4800,1125,200),90,TEAL)
+		if ads != null and ads.privacy_required(): text_in_box("Ad privacy",Rect2(1250,4800,1200,200),90,TEAL)
 		return
 	if state == "select":
 		draw_rect(Rect2(Vector2.ZERO,SIZE),INK)
@@ -564,7 +640,7 @@ func self_test() -> void:
 				push_error("Round starts solved: %d" % id)
 				get_tree().quit(1)
 				return
-			if id in [5,10,19,22,23,24]:
+			if id in [5,10,19,22,23,24,26]:
 				var suite = PuzzleTests.new(self,repetition%2 == 0)
 				if not suite.run_round(id):
 					get_tree().quit(1)
@@ -601,7 +677,7 @@ func capture_gallery() -> void:
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/level_%d.png" % id)
-	for id in [5,10,22,23,24]:
+	for id in [5,10,22,23,24,26]:
 		start_round(id)
 		remaining = 4.0
 		for p in pieces:
@@ -612,7 +688,7 @@ func capture_gallery() -> void:
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/drag_%d.png" % id)
-	for id in [11,15,21,23,24,25]:
+	for id in [2,10,11,15,19,21,23,24,25,26]:
 		start_round(id)
 		remaining = 4.0
 		for p in pieces:

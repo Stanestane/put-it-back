@@ -1,0 +1,4 @@
+{
+  "endpoint": "https://putitback.vdsolution.com/v1/events/batch",
+  "ingestion_key": "REPLACE_WITH_INGESTION_KEY"
+}

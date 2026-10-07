@@ -1,0 +1,8 @@
+[Unit]
+Description=Put It Back telemetry backup
+Requires=docker.service
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/put-it-back/backend/backup.sh
+ExecStartPost=/bin/bash /opt/put-it-back/backend/maintenance.sh

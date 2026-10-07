@@ -2,9 +2,13 @@
 
 Native Godot 4.7.2 portrait microgames, ported from the original HTML canvas / Capacitor project. Open `project.godot` and press F6/F5, or run the Windows executable.
 
+The [complete backend documentation](backend/README.md) covers architecture, API events, dashboard metrics, operations and backup/recovery. The [client integration guide](backend/docs/client-integration.md) documents the implemented Godot telemetry, configuration, collection controls, offline delivery and tests. The [deployment record](docs/telemetry-deployment.md) records the server setup; the [telemetry plan](docs/telemetry-plan.md) preserves the broader roadmap.
+
+Version **1.5.0** adds optional first-party analytics. Use **Usage data** on the main menu to allow or stop collection. It starts off. Configured native release builds report rounds, playtime and ad events over HTTPS, with a persistent offline queue. Editor/debug runs are disabled unless explicitly started with `--telemetry-test`, which uses a separate test identity. The standard Android debug APK therefore has collection disabled. See the [configuration and release instructions](backend/docs/client-integration.md#build-configuration) before shipping.
+
 Fix each scene within five seconds. Tap puzzles use a click or tap; books, pencils, paint tubes, juice bottles, and the garden use dragging with a mouse or one finger. Success and timeout both advance automatically. The main menu's **Choose Level** starts repeating practice rounds. Use **II**, Escape, or Android Back to pause; tap below the pause text to return to the menu. Best streak is saved locally. Touch and mouse use the same logical coordinates; portrait artwork is preserved with letterboxing.
 
-- **Hexagons (19):** repeating solid-color rows form recognizable stripes. One to three disjoint pairs of neighboring tiles start exchanged. Tap either misplaced tile to exchange it with its neighbor and repair the stripe. Correct tiles stay unchanged.
+- **Hexagons (19):** blue petals surround red centers in a full-screen flower pattern, with cream tiles between flowers. A red center and a cream tile start exchanged. Tap either misplaced tile to restore the pair. Correct tiles stay unchanged.
 - **Pencils (10) and books (22):** one item starts inserted out of order. Drag it to the appropriate position in the color sequence or book sequence. Items between its old and new positions shift; the surrounding objects preview the insertion without a yellow highlight. Valid incorrect insertions remain incorrect, while drops outside the row return the item to its previous position.
 - **Garden (5):** bushes sit on the eight circles drawn into the background; one begins slightly offset beside its own circle. Drag a loose bush onto any empty circle. Occupied circles and drops away from a circle are rejected.
 - **Plate stack (3):** five plates retain their correct vertical spacing. One to three begin shifted horizontally; tap their visible rims to center them.
@@ -19,7 +23,7 @@ Fix each scene within five seconds. Tap puzzles use a click or tap; books, penci
 
 All game inscriptions use the bundled Cooper Bold (`assets/fonts/COOPERB.TTF`), extracted from `Corel/COOPERB.zip`. Text has no outlines. The Play label and elevator numerals are drawn with this font instead of using the lettering baked into the original sprites.
 
-There are 27 playable variants. The eight original variants remain: fireplace, tower windows, drawer handles, building windows, ribbon tiles, circle tiles, road manhole, and pills. The additional puzzles use the supplied PNG sprites: elevator buttons (2), plates (3), garden (5), junction cover (6), switches (7), tools (9), pencils (10), cakes (11), ceramics (12), brickwork (15), parquet (17), hexagons (19), cookies (20 and 20b), bathroom tiles (21), bookshelf (22), paint tubes (23), juice bottles (24), and drawers (25). Original level numbers are preserved. The circle and cookie-shift variants use internal IDs 114 and 120. Plate-size ordering (103) has been removed.
+There are 28 playable variants. The eight original variants remain: fireplace, tower windows, drawer handles, building windows, ribbon tiles, circle tiles, road manhole, and pills. The additional puzzles use the supplied artwork: elevator buttons (2), plates (3), garden (5), junction cover (6), switches (7), tools (9), pencils (10), cakes (11), ceramics (12), brick arch (15), parquet (17), hexagons (19), cookies (20 and 20b), bathroom tiles (21), bookshelf (22), paint tubes (23), juice bottles (24), drawers (25), and dessert picture (26). Original level numbers are preserved; the previously unnumbered dessert picture is assigned 26. The circle and cookie-shift variants use internal IDs 114 and 120. Plate-size ordering (103) has been removed.
 
 The September art packs add four puzzles, available in both random play and the level picker:
 
@@ -31,6 +35,19 @@ The September art packs add four puzzles, available in both random play and the 
 `scripts/new_levels_tests.gd` verifies menu reachability, the new artwork, mouse/touch input, cross-row paint insertion, bottle exchanges, drawer opening depths, and timeout behavior. Gallery captures include the expanded picker, paint and bottle drag previews, and solved versions of the new scenes.
 
 Version 1.3.1 increases horizontal alignment faults for the lighthouse, house windows, drawer handles, fireplace, cakes, bathroom tiles, and plate/cookie stacks. Small objects shift roughly 20–25 pixels at the 500-pixel game width; larger objects shift farther, while cakes stay on their plates. Three-object scenes still have exactly one faulty object.
+
+Version 1.3.2 uses the replacement backgrounds supplied on September 23 for plates (3) and tools (9), correcting the tabletop and mounting-strip positions.
+
+Version 1.4.0 follows the September 29 references:
+
+- **Brick arch (15):** two fixed pillars support a stepped arch. One upper course begins shifted horizontally; tap it to center the whole course.
+- **Hexagons (19):** the flower layout replaces the earlier stripes and fills the screen as shown in the reference.
+- **Dessert picture (26):** drag square fragments to swap their positions and restore the image. One or two pairs begin exchanged. Valid wrong swaps remain playable; off-board drops and canceled drags restore the previous position.
+- **Pencils (10):** the replacement background lowers the tray; the pencils move with their slots.
+- **Elevator (2):** numbered and control buttons are centered on the circular mounts drawn into the background.
+- **Drawers (25):** upper drawers render in front of the row below when open, and hit testing follows the visible sprite surface.
+
+Source details and interpretation of the reference images are recorded in [the September reference notes](docs/september-reference-levels.md). The dessert picture currently uses the complete right-hand panel of the supplied JPEG through Godot atlas regions; a higher-resolution original can replace it later without changing its mechanics.
 
 `scripts/game.gd` owns the native renderer, round state, input, procedural original puzzles, and save data. `scripts/extra_levels.gd` composes the added scenes. `www/` and `android/` retain the original implementation for reference; Godot does not embed a web browser or use Capacitor. `Corel/` retains all original archives and drawing sources and remains Git-ignored as before. Extracted PNGs in `assets/new/` are included in the repository working tree.
 

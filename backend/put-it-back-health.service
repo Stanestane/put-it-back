@@ -1,0 +1,6 @@
+[Unit]
+Description=Put It Back telemetry health and disk checks
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/put-it-back/backend/check_health.sh

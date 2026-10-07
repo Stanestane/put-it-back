@@ -50,3 +50,11 @@ yarn-error.log
 # Generated Godot Gradle template (original Capacitor sources remain tracked)
 /android/build/
 /android/.build_version
+
+# Backend secrets and generated deployment artifacts
+/backend/.env
+/backend/credentials.json
+/backend/backups/
+/resources/telemetry_config.json
+__pycache__/
+.pytest_cache/

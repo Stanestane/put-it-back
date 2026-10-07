@@ -1,5 +1,6 @@
 extends RefCounted
 const Stacks = preload("res://scripts/stack_puzzles.gd")
+const References = preload("res://scripts/reference_levels.gd")
 ## Additional scenes composed from the supplied PNG exports.
 static func build(g, id: int) -> void:
 	match id:
@@ -7,9 +8,9 @@ static func build(g, id: int) -> void:
 			g.prompt = "STRAIGHTEN!"
 			for r in 5:
 				for c in 2:
-					g.add_piece("Button%d_Level2" % (r*2+c+1),Vector2(910+c*680,1110+r*510),Vector2(410,410),"rotate")
+					g.add_piece("Button%d_Level2" % (r*2+c+1),Vector2(907.5+c*685,1137.5+r*512.5),Vector2(400,400),"rotate")
 			for i in 3:
-				g.add_piece(["Button_close_Level2","Button_open_Level2","Button_alarm_Level2"][i],Vector2(770+i*480,3870),Vector2(385,385),"rotate")
+				g.add_piece(["Button_close_Level2","Button_open_Level2","Button_alarm_Level2"][i],Vector2(737.5+i*512.5,3862.5),Vector2(400,400),"rotate")
 		3,20,120:
 			Stacks.build(g,id)
 			return
@@ -41,7 +42,7 @@ static func build(g, id: int) -> void:
 				p.step = 6.0
 		10:
 			g.prompt = "DRAG INTO COLOR ORDER!"
-			for i in 12: g.art("Pencil%d_Level10" % (i+1),415+i*140,280,90,2053,"reorder")
+			for i in 12: g.art("Pencil%d_Level10" % (i+1),415+i*140,1230,90,2053,"reorder")
 			g.interaction.setup_order(415.0,50.0)
 			return
 		11:
@@ -60,15 +61,7 @@ static func build(g, id: int) -> void:
 					var angle = [[0,90],[270,180]][r%2][c%2]
 					g.add_piece("Tile_Level12",Vector2(312.5+c*625,312.5+r*625),Vector2(625,625),"rotate",angle)
 		15:
-			g.prompt = "FLIP THE ODD BRICK!"
-			for r in 6:
-				for c in 3:
-					g.art("Bricks_Level15",275.5+c*650,1660+r*280,650,280,"mirror")
-			# This sprite is 180-degree symmetric. Mirror one segment so the
-			# running brick joints break, while every segment stays on its grid.
-			var p = g.pieces[randi_range(1,4)*3+randi_range(0,2)]
-			p.flip_h = true
-			p.faults = 1
+			References.build_arch(g)
 			return
 		17:
 			g.prompt = "FIT THE PARQUET!"
@@ -81,15 +74,7 @@ static func build(g, id: int) -> void:
 					else:
 						for j in 2: g.art("Tile2_Level17",x,y+j*400,800,400,"move")
 		19:
-			g.prompt = "TAP TO FIX THE STRIPES!"
-			var colors = [1,2,3]
-			colors.shuffle()
-			for r in 7:
-				for c in 5:
-					var p = g.add_piece("Tile%d_Level19" % colors[r%3],Vector2(237.5+c*450+(r%2)*225,1100+r*390),Vector2(450,520),"swap")
-					p.row = r
-					p.column = c
-			g.interaction.swap_neighbors()
+			References.build_flowers(g)
 			return
 		21:
 			g.prompt = "ALIGN THE ODD TILE!"
@@ -158,6 +143,9 @@ static func build(g, id: int) -> void:
 			drawers.shuffle()
 			for i in randi_range(1,2):
 				g.set_drawer_depth(g.pieces[drawers[i]],randi_range(1,2))
+			return
+		26:
+			References.build_dessert(g)
 			return
 	g.disturb()
 	# Tight repeated layouts move vertically to keep every hit target accessible.

@@ -1,0 +1,33 @@
+{$TELEMETRY_HOST} {
+    request_body {
+        max_size 256KB
+    }
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        Cache-Control "no-store"
+    }
+    @api path /v1/events/batch /health/live /health/ready
+    handle @api {
+        reverse_proxy api:8000
+    }
+    @root path /
+    handle @root {
+        respond "Put It Back telemetry API. Health check: /health/ready" 200
+    }
+    handle {
+        respond "Not found" 404
+    }
+}
+
+# Keep VPN/local readiness checks independent of public DNS and Cloudflare.
+http://10.0.7.57 {
+    @health path /health/live /health/ready
+    handle @health {
+        header Cache-Control "no-store"
+        reverse_proxy api:8000
+    }
+    handle {
+        respond "Not found" 404
+    }
+}

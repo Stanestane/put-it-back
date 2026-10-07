@@ -1,0 +1,5 @@
+.env
+credentials.json
+backups
+__pycache__
+.pytest_cache

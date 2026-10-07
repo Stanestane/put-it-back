@@ -18,6 +18,7 @@ function Invoke-GodotChecked([string[]]$Arguments, [string]$Log) {
 }
 Invoke-GodotChecked @('--headless','--path','.','--editor','--import','--quit') 'verification/import.log'
 Invoke-GodotChecked @('--headless','--path','.','--script','tools/check_ads.gd') 'verification/ads-parser.log'
+Invoke-GodotChecked @('--headless','--path','.','--script','tools/test_telemetry.gd','--','--telemetry-unit-tests') 'verification/telemetry-tests.log'
 Invoke-GodotChecked @('--headless','--path','.','--quit-after','300','--','--self-test') 'verification/tests.log'
 if (-not (Select-String -Path verification/tests.log -Pattern 'SELF TEST PASSED')) { throw 'Test success marker missing' }
 Invoke-GodotChecked @('--path','.','--rendering-method','gl_compatibility','--audio-driver','Dummy','--','--gallery') 'verification/gallery.log'

@@ -29,19 +29,22 @@ func run(game) -> bool:
 			if p.faults > 0:
 				check(p.pos.distance_to(p.home) >= 89 and p.pos.distance_to(p.home) <= 121,"Bush no longer sits beside its own baseplate")
 		game.start_round(15)
-		var flipped = 0
+		var shifted_rows = {}
 		var odd = -1
 		for i in game.pieces.size():
 			var p = game.pieces[i]
-			check(p.pos == p.home and p.target == p.home and p.angle == 0,"Brick segment moved or rotated")
-			if p.get("flip_h",false):
-				flipped += 1
+			check(p.angle == 0 and not p.get("flip_h",false),"Arch bricks must retain their original orientation")
+			if p.faults > 0:
+				shifted_rows[p.arch_row] = true
 				odd = i
-		check(flipped == 1,"Wall must have exactly one mirrored segment")
+			elif p.mode == "static": check(p.pos == p.home,"Arch pillar moved")
+		check(shifted_rows.size() == 1,"Arch must have one displaced course")
+		check(game.pieces.size() == 16,"Arch lost its two pillars or stepped lintel")
 		if odd >= 0:
 			var input = preload("res://scripts/puzzle_tests.gd").new(game,repetition%2 == 0)
 			input.click(game.pieces[odd].pos)
-			check(game.state == "win" and not game.pieces[odd].flip_h,"Single tap did not restore brick pattern")
+			check(game.state == "win","Single tap did not center the arch course")
+			for p in game.pieces: check(p.target == p.home,"Restored arch is not aligned")
 		game.start_round(21)
 		var faults = 0
 		var art_scale = game.SIZE/Vector2(2500,5000)

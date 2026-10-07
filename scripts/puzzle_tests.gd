@@ -173,18 +173,26 @@ func test_garden() -> void:
 	check(filled.size() == 8,"Garden has duplicate occupied circles")
 
 func test_hex() -> void:
-	check(game.pieces.size() == 35,"Hex grid size changed")
+	check(game.pieces.size() == 98,"Flower grid must cover the whole screen")
 	var broken = fault_count()
-	check(broken in [2,4,6],"Hex grid needs 1–3 neighboring swaps")
+	check(broken == 2,"Flower grid needs one exchanged pair")
 	for i in game.pieces.size():
 		var p = game.pieces[i]
-		check(p.name == game.pieces[int(i/5)*5].name,"Solved hex row is not a recognizable color stripe")
+		if p.name == "Tile3_Level19" and p.home.x > 450 and p.home.x < 2050 and p.home.y > 520 and p.home.y < 4480:
+			var petals = 0
+			for other in game.pieces:
+				var distance: float = p.home.distance_to(other.home)
+				if distance > 1 and distance < 451:
+					petals += 1
+					check(other.name == "Tile2_Level19","Red flower center lacks a blue petal")
+			check(petals == 6,"Flower center does not have six petals")
 		if p.faults > 0:
 			var partner = game.pieces[p.partner]
 			check(partner.partner == i,"Hex swap is not reciprocal")
 			check(p.target == partner.home and partner.target == p.home,"Hex tiles were offset instead of exchanged")
-			check(p.home.distance_to(partner.home) < 451,"Swapped hexagons are not neighbors")
+			check(p.name != partner.name,"Exchanged flower colors are identical")
 		else:
+			if p.pos.y < 600 or p.pos.y > 4600 or p.pos.x < 100 or p.pos.x > 2300: continue
 			click(p.pos)
 			check(fault_count() == broken,"Correct hex tap altered pattern")
 	var taps = 0
@@ -193,6 +201,40 @@ func test_hex() -> void:
 			click(p.pos)
 			taps += 1
 	check(taps == broken/2 and game.solved() and game.state == "win","Hex ordering did not solve within 1–3 taps")
+
+func test_dessert() -> void:
+	check(game.pieces.size() == 32,"Dessert picture must have a 4 by 8 grid")
+	check(fault_count() in [2,4],"Dessert picture must start with one or two exchanged pairs")
+	var first = -1
+	for i in game.pieces.size():
+		check(game.tex(game.pieces[i].name) != null,"Missing dessert tile")
+		if game.pieces[i].faults > 0: first = i
+	if first < 0: return
+	var before = bottle_slots()
+	click(game.pieces[first].pos)
+	check(bottle_slots() == before and not game.solved(),"Tap auto-restored dessert picture")
+	drag(first,Vector2(-600,2500))
+	check(bottle_slots() == before,"Off-board drop changed the picture")
+	exercise_cancel(first)
+	check(bottle_slots() == before,"Canceled picture swap was committed")
+	# Make and undo a valid incorrect exchange.
+	var wrong = -1
+	for i in game.pieces.size():
+		if game.pieces[i].faults == 0 and i >= 4 and i < 28:
+			wrong = i
+			break
+	drag(first,game.pieces[wrong].target)
+	check(game.state == "play" and bottle_slots() != before,"Wrong picture exchange was not preserved")
+	drag(first,game.pieces[wrong].target)
+	check(bottle_slots() == before,"Reverse picture exchange failed")
+	for i in game.pieces.size():
+		if game.pieces[i].faults == 0: continue
+		for j in game.pieces.size():
+			if game.pieces[j].slot == i:
+				drag(i,game.pieces[j].target)
+				break
+	check(game.state == "win" and game.solved(),"Picture exchanges did not restore the image")
+	for p in game.pieces: check(p.target == p.home,"Solved picture tile is out of place")
 
 func bottle_slots() -> Array:
 	var slots = []
@@ -261,6 +303,7 @@ func run_round(id: int) -> bool:
 		10,22,23: test_order()
 		19: test_hex()
 		24: test_bottles()
+		26: test_dessert()
 	if id != 19:
 		game.start_round(id)
 		var index = 0

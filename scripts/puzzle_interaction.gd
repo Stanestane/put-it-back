@@ -142,7 +142,6 @@ func tap_hex(point: Vector2) -> bool:
 			neighbor.target = neighbor.home
 			p.faults = 0
 			neighbor.faults = 0
-			if game.solved(): game.finish(true)
 		return true
 	return false
 
@@ -198,7 +197,7 @@ func bottle_at(center: Vector2) -> int:
 		var p = game.pieces[i]
 		if p.mode != "exchange": continue
 		var delta: Vector2 = center-p.target
-		if absf(delta.x) > 140 or absf(delta.y) > 300: continue
+		if absf(delta.x) > minf(p.size.x*0.7,p.size.x/2+40) or absf(delta.y) > p.size.y/2: continue
 		if delta.length_squared() < distance:
 			distance = delta.length_squared()
 			nearest = i
@@ -259,6 +258,7 @@ func planting_at(center: Vector2) -> int:
 
 func pointer_up(point: Vector2, pointer: int) -> void:
 	if held < 0 or pointer != owner: return
+	var before: int = game.fault_count()
 	pointer_move(point,pointer)
 	var p = game.pieces[held]
 	if moved and hover >= 0 and game.state == "play" and not game.paused:
@@ -279,6 +279,8 @@ func pointer_up(point: Vector2, pointer: int) -> void:
 	held = -1
 	owner = -2
 	hover = -1
+	if game.state == "play" and not game.paused and not game.testing:
+		Telemetry.action(game.fault_count() < before)
 	if game.solved() and game.state == "play": game.finish(true)
 
 func cancel() -> void:

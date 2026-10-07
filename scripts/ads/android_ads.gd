@@ -2,6 +2,8 @@ extends Node
 signal shown
 signal closed
 const TEST_UNIT = "ca-app-pub-3940256099942544/1033173712"
+const AdAttempt = preload("res://scripts/telemetry/ad_attempt.gd")
+var attempt
 var settings: Resource
 var ad
 var loader
@@ -91,6 +93,9 @@ func _preload() -> void:
 	loading = true
 	generation += 1
 	var token = generation
+	attempt = AdAttempt.new(get_node("/root/Telemetry"), settings.test_ads)
+	var load_attempt = attempt
+	load_attempt.event("ad_requested")
 	loader = InterstitialAdLoader.new()
 	var callback = InterstitialAdLoadCallback.new()
 	callback.on_ad_loaded = func(value):
@@ -99,10 +104,13 @@ func _preload() -> void:
 			return
 		loading = false
 		ad = value
+		load_attempt.event("ad_loaded")
+		ad.on_ad_paid = func(payment): load_attempt.paid(payment.value_micros, payment.currency_code, payment.precision)
 		loaded_at = Time.get_ticks_msec()
 		retry_seconds = 15
 	callback.on_ad_failed_to_load = func(_error):
 		if token != generation: return
+		load_attempt.event("ad_failed", {"error_category":AdAttempt.error_category(_error)})
 		loading = false
 		_retry_later()
 	loader.load(TEST_UNIT if settings.test_ads else settings.production_interstitial_id, AdRequest.new(), callback)
@@ -117,15 +125,21 @@ func show_ad() -> void:
 	presenting = true
 	var token = generation
 	var callback = FullScreenContentCallback.new()
+	var show_attempt = attempt
+	callback.on_ad_impression = func(): show_attempt.event("ad_impression")
 	callback.on_ad_showed_full_screen_content = func():
 		if token == generation and presenting: shown.emit()
 	callback.on_ad_dismissed_full_screen_content = func(): _ad_closed(token, false)
-	callback.on_ad_failed_to_show_full_screen_content = func(_error): _ad_closed(token, true)
+	callback.on_ad_failed_to_show_full_screen_content = func(_error):
+		if token != generation: return
+		show_attempt.event("ad_failed", {"error_category":AdAttempt.error_category(_error)})
+		_ad_closed(token, true)
 	ad.full_screen_content_callback = callback
 	ad.show()
 
 func _ad_closed(token: int, failed: bool) -> void:
 	if token != generation or not presenting: return
+	if not failed: attempt.event("ad_closed")
 	presenting = false
 	_discard()
 	if failed: _retry_later()

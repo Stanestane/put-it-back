@@ -89,6 +89,16 @@ func _run() -> void:
 	check(activity.foreground_seconds == 0.75 and activity.gameplay_seconds == 0.5,"Checkpoint records incremental foreground/gameplay")
 	client.checkpoint()
 	check(names().count("activity_checkpoint") == 1,"Empty checkpoint suppressed")
+	client.start_round(7,true,1)
+	client.last_tick = 1000
+	client.tick(1.0/120,1.0/120,1008)
+	client.tick(1.0/120,1.0/120,1017)
+	check(is_equal_approx(client.round_data.active_seconds,0.017),"120 Hz tick quantization does not lose gameplay time")
+	client.tick(1.0/120,0.0,1025)
+	check(is_equal_approx(client.round_data.active_seconds,0.017),"Paused frame does not add gameplay time")
+	client.finish_round("timeout")
+	client.checkpoint()
+	client.last_tick = Time.get_ticks_msec()
 	var attempt = Attempt.new(client,true)
 	attempt.event("ad_requested")
 	attempt.event("ad_loaded")
@@ -129,6 +139,21 @@ func _run() -> void:
 	root.add_child(game)
 	game.set_process(false)
 	game.best = 2147483647 # Never change the player's progress save during fixtures.
+	check(not quit_on_go_back,"Engine must not auto-quit before Android Back navigation")
+	for screen in ["select", "usage"]:
+		game.state = screen
+		game.last_back_request_ms = -1000
+		game._notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
+		check(game.state == "splash","Android Back returns from " + screen)
+		game._handle_back_request(game.last_back_request_ms + 15)
+		check(game.state == "splash","Duplicate Android Back must not quit from " + screen)
+	game.state = "play"
+	game.paused = false
+	game._handle_back_request(game.last_back_request_ms + 300)
+	game._handle_back_request(game.last_back_request_ms + 15)
+	check(game.paused,"Duplicate Android Back must not undo pause")
+	game._handle_back_request(game.last_back_request_ms + 300)
+	check(not game.paused,"A later Android Back can resume")
 	game.start_round(1)
 	var p = game.pieces[0]
 	game.pieces.clear()

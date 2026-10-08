@@ -104,12 +104,14 @@ func record(payload: Dictionary, original_session: String = "") -> void:
 	disk_ok = store.save()
 	last_status = "queued" if disk_ok else "storage unavailable"
 
-func tick(seconds: float, playing_seconds: float) -> void:
+func tick(seconds: float, playing_seconds: float, now: int = Time.get_ticks_msec()) -> void:
 	if not collecting(): return
-	var now = Time.get_ticks_msec()
 	var monotonic_delta = (now - last_tick) / 1000.0
 	last_tick = now
-	_accumulate(monotonic_delta, minf(seconds, playing_seconds))
+	# Use the same clock for both counters. Taking min(frame delta, tick delta)
+	# each frame systematically loses time on high-refresh-rate phones.
+	var playing_fraction = clampf(playing_seconds / seconds, 0.0, 1.0) if seconds > 0 else 0.0
+	_accumulate(monotonic_delta, monotonic_delta * playing_fraction)
 	if now >= next_flush: flush()
 
 func _accumulate(seconds: float, playing_seconds: float) -> void:

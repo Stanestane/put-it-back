@@ -2,7 +2,7 @@
 
 [Index](../README.md) · [API contract](api.md) · [Metric definitions](reporting.md)
 
-Implemented for **game 1.5.0 / Android version code 12**, 7 October 2026.
+Implemented for **game 1.5.1 / Android version code 13**, updated 8 October 2026.
 The native game now records optional usage data and delivers it to
 `https://putitback.vdsolution.com/v1/events/batch`. Players do not need OpenVPN.
 Collection starts **off**. Source changes do not update existing installations:
@@ -50,6 +50,7 @@ and queue eviction affect retention; these are not total store-install counts.
 | [puzzle_interaction.gd](../../scripts/puzzle_interaction.gd) | One drag action per owning-pointer release |
 | [android_ads.gd](../../scripts/ads/android_ads.gd) | Actual AdMob load, impression, failure, close and paid callbacks |
 | [configure-telemetry.ps1](../../tools/configure-telemetry.ps1) | Generates ignored client configuration |
+| [build_telemetry_qa.ps1](../../tools/build_telemetry_qa.ps1) | Builds a separate Android app with the test flag embedded |
 | [test_telemetry.gd](../../tools/test_telemetry.gd) | Isolated storage, transport, lifecycle, ad and gameplay checks |
 | [smoke_telemetry.gd](../../tools/smoke_telemetry.gd) | Explicit live upload and persisted duplicate replay |
 
@@ -108,6 +109,28 @@ It does not automatically opt in.
 godot --path . -- --telemetry-test
 # In the QA game, open Usage data and allow it.
 ```
+
+For a physical Android device, build the dedicated QA package:
+
+```powershell
+& './tools/build_telemetry_qa.ps1'
+adb install -r exports/android/PutItBack-QA.apk
+adb shell am start -n com.vdsystem.putitback.qa/com.godot.game.GodotAppLauncher
+```
+
+It installs as **Put It Back QA**, package `com.vdsystem.putitback.qa`, alongside the
+normal game with separate saved progress. The build embeds `-- --telemetry-test`
+using Android's `command_line/extra_args`; usage collection still starts off and
+must be enabled in its menu. Events use environment=test and the existing Google
+test-ad settings. The helper restores the original export presets in a finally
+block and verifies APK signing. Do not run concurrent exports while it is building.
+If the helper process is forcibly killed, check export_presets.cfg for its temporary
+QA preset before the next normal export.
+
+Do not rely on `adb am start` intent extras to enable QA in the ordinary APK: the
+installed Godot Android runtime strips command-line extras from exported launcher
+activities. The embedded build flag avoids changing that protection. USB debugging
+must be authorized on the phone before ADB can install or drive either build.
 
 Build version comes from application/config/version; current puzzle_revision is
 1.5.0. Update both deliberately alongside export versions when releasing changes.
@@ -180,8 +203,9 @@ close. Show failures record ad_failed rather than a successful close.
 Paid values preserve integer micros and SDK precision (unknown, estimated,
 publisher_provided, precise). Invalid currency, precision or out-of-range value
 is ignored. A late paid callback can be recorded after dismissal if collection has
-not changed. Real-device callback verification and provider reconciliation remain
-separate checks; synthetic SDK-adapter tests cannot certify provider delivery.
+not changed. Actual test-ad callbacks were verified on Android on 8 October 2026.
+Production provider reconciliation remains separate; neither synthetic adapter
+tests nor zero-value test ads certify live paid-ad delivery.
 
 ## Persistence and delivery
 
@@ -280,12 +304,15 @@ Verified 7 October 2026:
   credentials file are absent from the Windows pack; no such files appeared in the
   Android package inspection.
 
-No Android device was connected. Before release, test a signed build on a device:
-opt-in/out and relaunch, airplane mode/reconnect, kill/relaunch with queued data,
-short/long background returns, random/practice rounds, invalid moves and actual SDK
-test-ad impression/paid callbacks. Compare expected counts/time against the backend
-using environment=test first. Debug APK success does not validate production
-signing, mobile lifecycle, UMP or paid-ad delivery.
+Physical Android validation followed on 8 October 2026 using a Samsung Galaxy S24+
+(Android 16), a separate QA package and `environment=test`. Offline persistence,
+restart/reconnect delivery, a bottle-swap win, random timeouts, queued-data opt-out,
+and actual AdMob test-ad impression/paid/close callbacks were confirmed against
+PostgreSQL. Device testing exposed Android Back auto-quitting and a high-refresh
+timing undercount; version 1.5.1 fixes both. See the
+[device validation record](../../docs/android-telemetry-validation.md) for evidence,
+retest results and remaining release checks. A debug-signed QA build does not
+validate production signing, UMP or live paid-ad delivery.
 
 Scheduled encrypted off-server backups, external alerts, gateway certificate
 renewal, acquisition/ROAS, long-term aggregates, provider reconciliation and

@@ -19,6 +19,7 @@ const AdManager = preload("res://scripts/ads/ad_manager.gd")
 var ads
 var app_foreground = true
 var resume_after_ad = false
+var last_back_request_ms = -1000
 var interaction
 var textures: Dictionary = {}
 var hit_images: Dictionary = {}
@@ -39,6 +40,8 @@ var testing = false
 var font = preload("res://assets/fonts/COOPERB.TTF")
 
 func _ready() -> void:
+	# Android Back belongs to the game's navigation, not SceneTree's auto-quit.
+	get_tree().quit_on_go_back = false
 	interaction = PuzzleInteraction.new(self)
 	scale = Vector2(500.0 / SIZE.x, 1000.0 / SIZE.y)
 	var save = ConfigFile.new()
@@ -451,10 +454,18 @@ func _notification(what: int) -> void:
 		interaction.cancel()
 		if state in ["play","win","lose"] and not (ads != null and ads.busy): paused = true
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
-		if state == "ad" or (ads != null and ads.busy): return
-		interaction.cancel()
-		if state in ["select", "usage"]: state = "splash"
-		elif state != "splash": paused = not paused
+		_handle_back_request()
+
+func _handle_back_request(now: int = Time.get_ticks_msec()) -> void:
+	# Godot 4.7 / Android target SDK 36 can deliver one Back press twice.
+	# Coalesce the key and dispatcher paths before either changes navigation.
+	if now - last_back_request_ms < 250: return
+	last_back_request_ms = now
+	if state == "ad" or (ads != null and ads.busy): return
+	interaction.cancel()
+	if state in ["select", "usage"]: state = "splash"
+	elif state != "splash": paused = not paused
+	else: get_tree().quit()
 
 func _advance_after_result() -> void:
 	state = "ad"

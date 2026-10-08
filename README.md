@@ -6,6 +6,8 @@ The [complete backend documentation](backend/README.md) covers architecture, API
 
 Version **1.5.0** adds optional first-party analytics. Use **Usage data** on the main menu to allow or stop collection. It starts off. Configured native release builds report rounds, playtime and ad events over HTTPS, with a persistent offline queue. Editor/debug runs are disabled unless explicitly started with `--telemetry-test`, which uses a separate test identity. The standard Android debug APK therefore has collection disabled. See the [configuration and release instructions](backend/docs/client-integration.md#build-configuration) before shipping.
 
+Version **1.5.1** fixes Android Back closing the app from the level picker or usage screen, and fixes telemetry undercounting active time on high-refresh-rate phones. A separate Android QA build supports device testing without replacing the normal app. See the [Android validation record](docs/android-telemetry-validation.md).
+
 Fix each scene within five seconds. Tap puzzles use a click or tap; books, pencils, paint tubes, juice bottles, and the garden use dragging with a mouse or one finger. Success and timeout both advance automatically. The main menu's **Choose Level** starts repeating practice rounds. Use **II**, Escape, or Android Back to pause; tap below the pause text to return to the menu. Best streak is saved locally. Touch and mouse use the same logical coordinates; portrait artwork is preserved with letterboxing.
 
 - **Hexagons (19):** blue petals surround red centers in a full-screen flower pattern, with cream tiles between flowers. A red center and a cream tile start exchanged. Tap either misplaced tile to restore the pair. Correct tiles stay unchanged.

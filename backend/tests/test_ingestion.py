@@ -112,6 +112,14 @@ def test_read_only_reporting_and_mature_retention():
                               (test_event['install_id'],)).fetchone()[0] == 0
         with psycopg.connect(os.environ['TEST_READER_DATABASE_URL']) as reader:
             reader.execute('SELECT * FROM analytics.audience LIMIT 1')
+            assert reader.execute('SELECT count(*) FROM analytics.qa_events WHERE install_id=%s',
+                                  (test_event['install_id'],)).fetchone()[0] == 1
+            assert reader.execute('SELECT count(*) FROM analytics.qa_events WHERE install_id=%s',
+                                  (install,)).fetchone()[0] == 0
+            assert reader.execute("SELECT count(*) FROM analytics.qa_events WHERE environment<>'test'").fetchone()[0] == 0
+            with pytest.raises(psycopg.Error):
+                reader.execute('SELECT * FROM public.events LIMIT 1')
+            reader.rollback()
             with pytest.raises(psycopg.Error):
                 reader.execute('DELETE FROM public.events')
     finally:

@@ -4,11 +4,15 @@
 
 ## Access and basic use
 
-Connect OpenVPN, run `tools/open-telemetry-dashboard.ps1` from the project, and keep
-its terminal open. Visit http://localhost:3300/dashboard/2 on that same computer.
+Connect OpenVPN when offsite, run `tools/open-telemetry-dashboard.ps1` from the
+project, and keep its terminal open. Visit http://localhost:3300/dashboard/2 for
+production or http://localhost:3300/dashboard/3 for QA on that same computer.
 Use the dashboard credentials from the private credential file, not the SSH password.
 On another computer, create its own tunnel; localhost always refers to the browser's
 computer. Disconnecting the tunnel does not stop Metabase or collection.
+On the server LAN, OpenVPN is unnecessary if SSH is reachable. The
+[access guide](dashboard-access.md) covers another computer, first-time host-key
+verification, passwords and port conflicts without requiring the project files.
 
 The dashboard is named **Game KPIs**. Its ID is 2 on the current deployment; IDs can
 differ after a fresh setup. The current URL is saved in credentials.json. Nine saved
@@ -17,7 +21,7 @@ date/build/platform filters; some tables expose those dimensions as columns.
 
 Refresh a report to query the views. They are live SQL, not scheduled daily snapshots.
 Rows change after new/offline events arrive or retention deletes old events. With no
-game integration, empty tables are expected. The audience view still generates 90
+production activity, empty tables are expected. The audience view still generates 90
 calendar rows with zero activity. Sample Metabase content, if present, is not game data.
 
 ## Reports and backing views
@@ -36,6 +40,60 @@ calendar rows with zero activity. Sample Metabase content, if present, is not ga
 
 The tenth view, `analytics.activity`, is a helper containing distinct `(day, install_id)`
 pairs. It is readable by the reporting role but is not a separate dashboard card.
+
+## QA dashboard
+
+Open **[Game QA (test data)](http://localhost:3300/dashboard/3)** through the same
+SSH tunnel (over LAN or VPN), using the same Metabase login. This separate dashboard has ten
+cards over `analytics.qa_events`, a view restricted to `environment=test`:
+
+| Card | What it shows |
+| --- | --- |
+| Received events | Total retained test events, including ads and synthetic smoke tests |
+| Test installations | Distinct installations with retained test events; not unique people |
+| Finished rounds | Received test round finishes |
+| Daily activity | UTC day/platform/build, sessions, starts/finishes and checkpoint playtime |
+| Sessions and playtime | Latest 100 installation/session/platform/build groups and checkpoint durations |
+| Level results | Starts, finishes, wins, timeouts, abandonment, incomplete rounds, mean win/timeout time and incorrect actions by level/mode/revision/build/platform |
+| Recent round results | Latest 100 finishes, including actions, faults, duration and round/session IDs |
+| Ad callbacks by attempt | Latest 100 attempt groups with request/load/failure/impression/paid/close counts and test-ad flag |
+| Paid callbacks (not real revenue) | Latest 100 SDK/synthetic paid events; original integer micros, currency, precision and test-ad flag |
+| Ingestion and upload delay | Received UTC day/build/platform/event counts, mean delay and last receipt |
+
+Refresh the dashboard to query newly received events. The installed QA app was
+left with **Usage data: off**; allow it in that app to collect another test run.
+Data normally uploads while the app is foregrounded, with a roughly 20-second
+cadence and retries after network failures. Keep the app open before refreshing.
+
+Counts include both the Android device and synthetic Godot smoke tests. Use build
+and platform columns to distinguish them. All-retained-data headline counts are
+not today's DAU. Session first/last event times are observation bounds, not session
+duration; duration comes from checkpoints. An unfinished round can reflect a
+force-stop, opt-out, or missing upload. A zero-valued paid callback confirms delivery
+of a test callback, not real ad earnings. No production events are included, even
+if their ad payload has `test_ad=true`; the production reports are unchanged.
+
+The reporting role can read the QA view but cannot select the underlying raw events
+table. The QA view omits fingerprints and sequence numbers. Retention is the same
+as other raw events (90 days by default). There are no dashboard-wide date/build
+filters; recent-detail cards have explicit limits, while aggregate cards cover all
+retained test data. Dashboard ID 3 applies to this deployment; setup prints the ID
+on other installations.
+
+From `/opt/put-it-back/backend`, after the normal backend and Metabase setup:
+
+```sh
+sudo docker compose exec -T db psql -U postgres -d telemetry -v ON_ERROR_STOP=1 < qa-view.sql
+sudo python3 setup_qa_dashboard.py
+sudo python3 setup_qa_dashboard.py --verify-only
+```
+
+Fresh databases also receive the view from `schema.sql`. The additive migration
+does not recreate production views. Setup creates or reconciles only the dashboard
+named **Game QA (test data)** and its ten cards, and executes each query. Rerunning
+it restores its managed queries/layout; keep custom reports on a different
+dashboard. `--verify-only` checks saved SQL and executes queries without editing.
+Neither mode rewrites credentials or production dashboard configuration.
 
 ## Shared definitions and exclusions
 

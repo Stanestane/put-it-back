@@ -130,6 +130,11 @@ SELECT r.day,r.currency,r.revenue,a.dau,d.impressions,
  THEN 1000*r.revenue/NULLIF(d.impressions,0) END AS ecpm
 FROM daily_revenue r LEFT JOIN analytics.audience a ON a.day=r.day
 LEFT JOIN analytics.ad_delivery d ON d.day=r.day;
+-- QA reports can inspect test events without access to the underlying raw table.
+CREATE OR REPLACE VIEW analytics.qa_events AS
+SELECT event_id, install_id, session_id, occurred_at, received_at,
+       build_version, platform, environment, name, payload
+FROM public.events WHERE environment='test';
 GRANT USAGE ON SCHEMA public TO telemetry_api;
 GRANT SELECT,INSERT ON events TO telemetry_api;
 GRANT SELECT,INSERT,UPDATE ON installations TO telemetry_api;

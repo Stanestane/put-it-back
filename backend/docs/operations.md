@@ -9,7 +9,8 @@ examples run on Ubuntu. Commands needing root use sudo or an explicitly opened r
 shell. The deployment path is `/opt/put-it-back/backend`; the helper scripts assume
 this exact path, so relocating requires updating scripts and systemd units.
 
-Connect the configured OpenVPN profile, then:
+Connect the configured OpenVPN profile when offsite; on the server LAN use the
+direct route to SSH. From the project root:
 
 ```powershell
 ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile=verification/server_known_hosts stane@10.0.7.57
@@ -26,7 +27,10 @@ or from the project root:
 ssh -N -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=verification/server_known_hosts -L 127.0.0.1:3300:127.0.0.1:3300 stane@10.0.7.57
 ```
 
-Visit http://localhost:3300/dashboard/2 while that process and VPN remain connected.
+Visit http://localhost:3300/dashboard/2 for production or
+http://localhost:3300/dashboard/3 for QA while the tunnel remains connected.
+See [access from another LAN computer](dashboard-access.md#another-computer-on-the-servers-local-network)
+for a standalone command, the verified host fingerprint and first-login steps.
 If local port 3300 is occupied, use `-L 127.0.0.1:3301:127.0.0.1:3300` and browse port
 3301, or close the old tunnel. The server dashboard remains bound to loopback.
 
@@ -151,6 +155,8 @@ sudo python3 verify_proxy.py
   test DB requiring identification and removal.
 - verify_dashboard.py logs in with saved credentials, executes nine saved questions,
   and logs out. It expects nine cards and a current dashboard URL.
+- setup_qa_dashboard.py --verify-only checks the ten QA cards and their test-only
+  SQL, executes their queries, and logs out. See [QA setup and definitions](reporting.md#qa-dashboard).
 - verify_proxy.py uploads one test event through public HTTPS, retries it, verifies
   401 and 413 handling, then removes only its generated installation/events in a
   finally block. Interrupted cleanup can leave harmless synthetic test data.
@@ -276,8 +282,8 @@ applied. Live SQL reports reflect deletion on their next query.
 | Symptom | Checks and response |
 | --- | --- |
 | Public root shows API text | Expected; use the private Metabase URL for reports |
-| localhost:3300 unreachable | OpenVPN, tunnel process, local port conflict, then server Metabase health |
-| SSH timeout | VPN and route to 10.0.7.57; do not change public DNS to fix SSH |
+| localhost:3300 unreachable | LAN/VPN connectivity, tunnel process on the browser's computer, local port conflict, then server Metabase health |
+| SSH timeout | LAN/VLAN route to 10.0.7.57:22 or OpenVPN when offsite; do not change public DNS to fix SSH |
 | Public readiness 503 | API/DB health and logs; DB privileges/connectivity; free disk |
 | Cloudflare 403/challenge | Check application User-Agent, exact route and edge rules; ask gateway administrator to allow legitimate API clients if necessary |
 | Redirect loop | Backend TELEMETRY_HOST must remain http:// behind the existing TLS gateway |

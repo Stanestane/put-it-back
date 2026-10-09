@@ -34,7 +34,7 @@ flowchart LR
     A --> P[(PostgreSQL: telemetry)]
     M[Metabase] -->|Read-only reporting role| P
     M --> MB[(PostgreSQL: metabase)]
-    O[Operator browser] -->|localhost:3300| T[SSH tunnel over OpenVPN]
+    O[Operator browser] -->|localhost:3300| T[SSH tunnel over LAN or OpenVPN]
     T -->|Server loopback:3300| M
 ```
 
@@ -69,7 +69,7 @@ router or gateway settings were changed during the backend deployment.
 | `api` | 8000 | None | Ingestion and API health |
 | `db` | 5432 | None | Both databases |
 | `metabase` | 3000 | `127.0.0.1:3300` | Dashboard via SSH |
-| Host SSH | Not a container | Port 22 | VPN administration |
+| Host SSH | Not a container | Port 22 | LAN/VPN administration and dashboard tunnels |
 
 Public-Host requests can reach `/`, `/health/live`, `/health/ready`, and
 `/v1/events/batch`; other paths return 404. Requests addressed to `http://10.0.7.57`
@@ -179,7 +179,8 @@ the gateway, SSH and Metabase may keep separate logs outside event-retention pol
 | `Dockerfile`, `requirements.txt`, `.dockerignore` | API build and exclusions |
 | `compose.yaml`, `Caddyfile` | Services, exposure, volumes, routing |
 | `bootstrap.py`, `pin_images.py` | Secrets and deployed image references |
-| `setup_dashboard.py`, `verify_dashboard.py` | Dashboard setup and verification |
+| `setup_dashboard.py`, `verify_dashboard.py` | Production dashboard setup and verification |
+| `qa-view.sql`, `setup_qa_dashboard.py` | Test-only reporting view migration, QA dashboard setup and verification |
 | `test.sh`, `tests/test_ingestion.py` | Nine tests using a temporary DB |
 | `verify_proxy.py` | Public upload smoke test with synthetic cleanup |
 | `backup.sh`, `maintenance.sh` | Logical dumps and retention |

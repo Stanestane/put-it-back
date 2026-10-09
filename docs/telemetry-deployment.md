@@ -27,8 +27,21 @@ lifecycle/round/ad instrumentation and optional collection controls, described i
 the [client guide](../backend/docs/client-integration.md). On 7 October, actual Godot
 HTTPS accepted 12 test events and returned 12 duplicates after persisted replay,
 with no rejected events. These test events are excluded from production KPIs.
-Player collection requires a configured release build and opt-in; Android device
-validation remains outstanding.
+Player collection requires a configured release build and opt-in. Android device
+validation subsequently passed on 8 October; see the [validation record](android-telemetry-validation.md).
+
+On 9 October, **Game QA (test data)** was added at
+`http://localhost:3300/dashboard/3`, using the same private tunnel and login. Ten
+cards query the new `analytics.qa_events` view, which admits only test events.
+The nine production cards and their views were retained. Existing device and
+synthetic smoke-test events populate the QA dashboard. All ten QA queries and all
+nine production queries passed; the nine backend tests passed with added checks
+for QA/production isolation and denial of raw-table access to the reporting role.
+Setup was rerun successfully and its saved queries verified without duplicate cards.
+Chrome rendering was checked across all ten cards with no page errors. At validation
+the dashboard showed 254 retained test events, two test installations and 41 finished
+rounds. The two installations represent the Android device and Windows smoke test.
+The reproducible migration/setup is documented in the [QA dashboard guide](../backend/docs/reporting.md#qa-dashboard).
 
 Validation completed:
 

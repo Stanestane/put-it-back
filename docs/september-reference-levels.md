@@ -13,6 +13,6 @@ Implemented on September 30, 2026, using files from `Downloads/Pot it back` and 
 
 The first three screenshots have no written annotations. Their changes address the visible overlap/alignment issues, with the replacement pencil background establishing the intended lower tray position.
 
-No separate dessert artwork archive was present in Downloads. `assets/new/DessertTable_Reference.jpg` retains the supplied 921 by 880 JPEG unchanged. Godot `AtlasTexture` regions use its solved right-hand panel (x=476, y=13, width=429, height=856). This preserves the actual supplied artwork rather than recreating it. The panel has screenshot-level resolution; replace the source with a higher-resolution original if one becomes available.
+At the September implementation, no separate dessert artwork archive was present in Downloads. `assets/new/DessertTable_Reference.jpg` retains the supplied 921 by 880 JPEG unchanged. The original implementation used its solved right-hand panel (x=476, y=13, width=429, height=856). Version 1.5.2 replaces that screenshot crop with the full-resolution PNG supplied in October; see [October artwork notes](october-level-art.md).
 
 All existing level IDs are occupied through 25, so the previously unnumbered missing scene uses ID 26. `scripts/reference_levels.gd` defines the new layouts. Tests cover arch-course repair, flower geometry, picture swaps and cancellation, drawer occlusion, and access to every level in the picker.

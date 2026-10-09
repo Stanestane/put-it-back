@@ -3,7 +3,7 @@
 Last reviewed against the implementation: **9 October 2026**.
 
 The backend is deployed and its public HTTPS endpoint has passed ingestion checks.
-Godot 1.5.1 includes optional usage collection, durable queuing and gameplay/ad
+Godot 1.5.2 includes optional usage collection, durable queuing and gameplay/ad
 instrumentation. Collection starts off in configured release builds. Actual Godot
 test uploads, duplicate replay and [Android device validation](../docs/android-telemetry-validation.md)
 passed. Production release distribution remains separate.

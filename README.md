@@ -10,6 +10,8 @@ Version **1.5.0** adds optional first-party analytics. Use **Usage data** on the
 
 Version **1.5.1** fixes Android Back closing the app from the level picker or usage screen, and fixes telemetry undercounting active time on high-refresh-rate phones. A separate Android QA build supports device testing without replacing the normal app. See the [Android validation record](docs/android-telemetry-validation.md).
 
+Version **1.5.2** replaces level 26's screenshot-based dessert image with the supplied 2500 × 5000 PNG, preserving the 4 by 8 tile-swap puzzle. The level 10 ZIP matches the pencil background already integrated in 1.4.0. Both supplied archives are recorded in the [October artwork notes](docs/october-level-art.md).
+
 Fix each scene within five seconds. Tap puzzles use a click or tap; books, pencils, paint tubes, juice bottles, and the garden use dragging with a mouse or one finger. Success and timeout both advance automatically. The main menu's **Choose Level** starts repeating practice rounds. Use **II**, Escape, or Android Back to pause; tap below the pause text to return to the menu. Best streak is saved locally. Touch and mouse use the same logical coordinates; portrait artwork is preserved with letterboxing.
 
 - **Hexagons (19):** blue petals surround red centers in a full-screen flower pattern, with cream tiles between flowers. A red center and a cream tile start exchanged. Tap either misplaced tile to restore the pair. Correct tiles stay unchanged.
@@ -51,7 +53,7 @@ Version 1.4.0 follows the September 29 references:
 - **Elevator (2):** numbered and control buttons are centered on the circular mounts drawn into the background.
 - **Drawers (25):** upper drawers render in front of the row below when open, and hit testing follows the visible sprite surface.
 
-Source details and interpretation of the reference images are recorded in [the September reference notes](docs/september-reference-levels.md). The dessert picture currently uses the complete right-hand panel of the supplied JPEG through Godot atlas regions; a higher-resolution original can replace it later without changing its mechanics.
+Source details and interpretation of the reference images are recorded in [the September reference notes](docs/september-reference-levels.md). The dessert picture now uses the complete original PNG through Godot atlas regions; the old comparison JPEG is retained only as a historical reference.
 
 `scripts/game.gd` owns the native renderer, round state, input, procedural original puzzles, and save data. `scripts/extra_levels.gd` composes the added scenes. `www/` and `android/` retain the original implementation for reference; Godot does not embed a web browser or use Capacitor. `Corel/` retains all original archives and drawing sources and remains Git-ignored as before. Extracted PNGs in `assets/new/` are included in the repository working tree.
 

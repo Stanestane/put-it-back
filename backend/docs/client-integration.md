@@ -2,7 +2,7 @@
 
 [Index](../README.md) · [API contract](api.md) · [Metric definitions](reporting.md)
 
-Implemented for **game 1.5.1 / Android version code 13**, updated 8 October 2026.
+Current build: **game 1.5.2 / Android version code 14**, updated 9 October 2026.
 The native game now records optional usage data and delivers it to
 `https://putitback.vdsolution.com/v1/events/batch`. Players do not need OpenVPN.
 Collection starts **off**. Source changes do not update existing installations:
@@ -133,7 +133,7 @@ activities. The embedded build flag avoids changing that protection. USB debuggi
 must be authorized on the phone before ADB can install or drive either build.
 
 Build version comes from application/config/version; current puzzle_revision is
-1.5.0. Update both deliberately alongside export versions when releasing changes.
+1.5.2 (October artwork update). Update both deliberately alongside export versions when releasing changes.
 Queued events preserve original dimensions after upgrades.
 
 ## Event lifecycle and clocks

@@ -69,9 +69,10 @@ func tex(name: String) -> Texture2D:
 		if name.begins_with("DessertTile"):
 			var index = int(name.trim_prefix("DessertTile"))
 			var tile = AtlasTexture.new()
-			tile.atlas = preload("res://assets/new/DessertTable_Reference.jpg")
-			# The complete right-hand panel of the supplied comparison image.
-			tile.region = Rect2(476+(index%4)*107.25,13+int(index/4)*107,107.25,107)
+			tile.atlas = preload("res://assets/new/Picture_Level26.png")
+			# Slice the complete original artwork into the same 4 by 8 puzzle.
+			var tile_size = tile.atlas.get_size()/Vector2(4,8)
+			tile.region = Rect2(Vector2(index%4,int(index/4))*tile_size,tile_size)
 			tile.filter_clip = true
 			textures[name] = tile
 			return tile

@@ -147,7 +147,7 @@ func start_round(level_id: int, practice: bool, faults: int) -> void:
 	if not collecting(): return
 	finish_round("abandoned")
 	round_session = session_id
-	round_data = {"round_id":uuid(), "level_id":level_id, "mode":"practice" if practice else "random", "puzzle_revision":"1.5.0"}
+	round_data = {"round_id":uuid(), "level_id":level_id, "mode":"practice" if practice else "random", "puzzle_revision":"1.5.2"}
 	var payload = round_data.duplicate()
 	payload.name = "round_started"
 	record(payload)

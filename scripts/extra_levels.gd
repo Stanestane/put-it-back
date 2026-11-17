@@ -1,9 +1,13 @@
 extends RefCounted
 const Stacks = preload("res://scripts/stack_puzzles.gd")
 const References = preload("res://scripts/reference_levels.gd")
+const November = preload("res://scripts/november_levels.gd")
 ## Additional scenes composed from the supplied PNG exports.
 static func build(g, id: int) -> void:
 	match id:
+		27,28,29:
+			November.build(g,id)
+			return
 		2:
 			g.prompt = "STRAIGHTEN!"
 			for r in 5:

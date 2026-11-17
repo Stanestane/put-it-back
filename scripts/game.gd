@@ -8,8 +8,8 @@ const TEAL = Color("203e43")
 const SUCCESS = Color("31594a")
 const RETRY = Color("87473d")
 const YELLOW = Color("fff869")
-const LEVELS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,114,15,16,17,18,19,20,120,21,22,23,24,25,26]
-const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",11:"Cakes",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brick arch",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf",23:"Paint tubes",24:"Juice bottles",25:"Drawers",26:"Dessert picture"}
+const LEVELS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,114,15,16,17,18,19,20,120,21,22,23,24,25,26,27,28,29]
+const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",11:"Cakes",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brick arch",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf",23:"Paint tubes",24:"Juice bottles",25:"Drawers",26:"Dessert picture",27:"Dining chairs",28:"Knife shapes",29:"Ice creams"}
 const ExtraLevels = preload("res://scripts/extra_levels.gd")
 const PuzzleInteraction = preload("res://scripts/puzzle_interaction.gd")
 const PuzzleTests = preload("res://scripts/puzzle_tests.gd")
@@ -363,6 +363,9 @@ func _tap_puzzle(point: Vector2) -> bool:
 	front_to_back.reverse()
 	for i in front_to_back:
 		var p = pieces[i]
+		if p.get("alpha_hit",false):
+			if not stack_hit(p,point): continue
+			if p.mode == "static" or p.faults <= 0: return false
 		if not p.mode in ["move","rotate","face","mirror","close"]: continue
 		if p.mode == "close":
 			if not stack_hit(p,point): continue
@@ -643,6 +646,9 @@ func self_test() -> void:
 	if not preload("res://scripts/new_levels_tests.gd").new().run(self):
 		get_tree().quit(1)
 		return
+	if not preload("res://scripts/november_levels_tests.gd").new().run(self):
+		get_tree().quit(1)
+		return
 	# Exercise real hit testing and completion for every generated puzzle.
 	for id in LEVELS:
 		for repetition in 20:
@@ -652,6 +658,15 @@ func self_test() -> void:
 				push_error("Round starts solved: %d" % id)
 				get_tree().quit(1)
 				return
+			if id == 28:
+				var input = PuzzleTests.new(self,repetition%2 == 0)
+				for i in pieces.size():
+					if pieces[i].faults > 0: input.drag(i,pieces[i].home)
+				if input.failures > 0 or not solved() or state != "win":
+					push_error("Knife shape round could not be solved")
+					get_tree().quit(1)
+					return
+				continue
 			if id in [5,10,19,22,23,24,26]:
 				var suite = PuzzleTests.new(self,repetition%2 == 0)
 				if not suite.run_round(id):
@@ -700,7 +715,7 @@ func capture_gallery() -> void:
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/drag_%d.png" % id)
-	for id in [2,10,11,15,19,21,23,24,25,26]:
+	for id in [2,10,11,15,19,21,23,24,25,26,27,28,29]:
 		start_round(id)
 		remaining = 4.0
 		for p in pieces:

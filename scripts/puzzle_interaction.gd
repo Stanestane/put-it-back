@@ -125,6 +125,7 @@ func swap_neighbors() -> void:
 		second.faults = 1
 
 func hit(p: Dictionary, point: Vector2) -> bool:
+	if p.get("alpha_hit",false): return game.stack_hit(p,point)
 	if p.get("stack",false): return game.stack_hit(p,point)
 	var local: Vector2 = (point-p.pos).rotated(-deg_to_rad(p.angle))
 	if p.mode == "swap":
@@ -154,7 +155,8 @@ func pointer_down(point: Vector2, pointer: int) -> void:
 	front_to_back.reverse()
 	for i in front_to_back:
 		var p = game.pieces[i]
-		if not p.mode in ["reorder","place","exchange"] or not hit(p,point): continue
+		if not p.mode in ["reorder","place","exchange","fit"] or not hit(p,point): continue
+		if p.mode == "fit" and p.faults == 0: return
 		if order_vertical and (i == 0 or i == order.size()-1): return
 		held = i
 		owner = pointer
@@ -185,6 +187,9 @@ func pointer_move(point: Vector2, pointer: int) -> void:
 		else: layout_order(order)
 	elif p.mode == "exchange":
 		hover = bottle_at(p.pos)
+	elif p.mode == "fit":
+		# Only the matching silhouette accepts this piece.
+		hover = held if absf(p.pos.x-p.home.x) <= 150 and absf(p.pos.y-p.home.y) <= 200 else -1
 	else:
 		hover = planting_at(p.pos)
 	game.queue_redraw()
@@ -269,6 +274,9 @@ func pointer_up(point: Vector2, pointer: int) -> void:
 			refresh_order_faults()
 		elif p.mode == "exchange":
 			exchange_bottles(held,hover)
+		elif p.mode == "fit":
+			p.target = p.home
+			p.faults = 0
 		else:
 			p.slot = hover
 			p.target = planting_spots[hover]

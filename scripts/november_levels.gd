@@ -2,6 +2,25 @@ extends RefCounted
 ## November PNG packs, composed in their original 2500 by 5000 art space.
 static func build(g, id: int) -> void:
 	match id:
+		17:
+			g.prompt = "TURN THE LABELS FORWARD!"
+			g.art("Top_Shelf_Level17",200,1100,2100,980)
+			g.art("Middle_Shelf_Level17",200,2080,2100,700)
+			g.art("Bottom_Shelf_Level17",200,2780,2100,950)
+			var sizes = [Vector2(410,560),Vector2(310,560),Vector2(280,480),Vector2(250,490),Vector2(210,560)]
+			var products: Array = []
+			for row in 3:
+				for i in 5:
+					var size: Vector2 = sizes[i]*0.85
+					var p = g.add_piece("Item%d_Front_Level17" % (i+1),Vector2(530+i*360,2030+row*700-size.y/2),size,"face")
+					p.correct_name = p.name
+					p.back_name = "Item%d_Back_Level17" % (i+1)
+					p.alpha_hit = true
+					products.append(p)
+			products.shuffle()
+			for i in randi_range(1,2):
+				products[i].name = products[i].back_name
+				products[i].faults = 1
 		27:
 			g.prompt = "STRAIGHTEN THE CHAIRS!"
 			for seat in [[Vector2(1250,800),180], [Vector2(1250,4200),0],
@@ -40,3 +59,27 @@ static func build(g, id: int) -> void:
 				if p.faults == 0: continue
 				p.target = p.home+Vector2(120*[-1,1].pick_random(),0)
 				p.pos = p.target
+		30:
+			g.prompt = "TIDY UP FOR BED!"
+			# The cover ends at the mattress foot; pillows sit below its headboard.
+			var cover = g.art("Covers3_Level30",470,1565,1560,1650,"face")
+			cover.correct_name = cover.name
+			for x in [875,1625]:
+				var pillow = g.add_piece("Pillow_Level30",Vector2(x,1400),Vector2(726,406)*0.9,"rotate")
+				pillow.step = 8.0
+			for x in [240,2260]:
+				var lamp = g.add_piece("Lamp_Off_Level30",Vector2(x,1190),Vector2(410,410),"face")
+				lamp.correct_name = lamp.name
+			for p in g.pieces: p.alpha_hit = true
+			var candidates = range(g.pieces.size())
+			candidates.shuffle()
+			for i in randi_range(1,2):
+				var p = g.pieces[candidates[i]]
+				p.faults = 1
+				if p == cover:
+					p.name = "Covers%d_Level30" % randi_range(1,2)
+				elif p.mode == "rotate":
+					p.rotation_target = -p.step
+					p.angle = p.rotation_target
+				else:
+					p.name = "Lamp_On_Level30"

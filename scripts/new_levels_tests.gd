@@ -6,7 +6,7 @@ func check(ok: bool, message: String) -> void:
 	if not ok and message not in failures: failures.append(message)
 
 func run(game) -> bool:
-	check(game.LEVELS.size() == 31,"Expected 31 playable variants")
+	check(game.LEVELS.size() == 34,"Expected 34 playable variants")
 	for i in game.LEVELS.size():
 		var rect: Rect2 = game.level_button_rect(i)
 		check(rect.end.y < 4750,"Level picker overlaps its footer")

@@ -8,8 +8,8 @@ const TEAL = Color("203e43")
 const SUCCESS = Color("31594a")
 const RETRY = Color("87473d")
 const YELLOW = Color("fff869")
-const LEVELS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,114,15,16,17,18,19,20,120,21,22,23,24,25,26,27,28,29]
-const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",8:"Handles",9:"Tools",10:"Pencils",11:"Cakes",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brick arch",16:"Manhole",17:"Parquet",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf",23:"Paint tubes",24:"Juice bottles",25:"Drawers",26:"Dessert picture",27:"Dining chairs",28:"Knife shapes",29:"Ice creams"}
+const LEVELS = [1,2,3,4,5,6,7,107,8,9,109,10,11,12,13,14,114,15,16,17,18,19,20,120,21,22,23,24,25,26,27,28,29,30]
+const NAMES = {1:"Fireplace",2:"Elevator",3:"Plate stack",4:"Tower",5:"Garden",6:"Road junction",7:"Switches",107:"Eight switches",8:"Handles",9:"Tools",109:"Tool sizes",10:"Pencils",11:"Cakes",12:"Ceramics",13:"Windows",14:"Ribbons",114:"Circles",15:"Brick arch",16:"Manhole",17:"Grocery shelf",18:"Pills",19:"Hexagons",20:"Cookie facing",120:"Cookie shift",21:"Bathroom",22:"Bookshelf",23:"Paint tubes",24:"Juice bottles",25:"Drawers",26:"Dessert picture",27:"Dining chairs",28:"Knife shapes",29:"Ice creams",30:"Bedtime"}
 const ExtraLevels = preload("res://scripts/extra_levels.gd")
 const PuzzleInteraction = preload("res://scripts/puzzle_interaction.gd")
 const PuzzleTests = preload("res://scripts/puzzle_tests.gd")
@@ -715,7 +715,7 @@ func capture_gallery() -> void:
 		queue_redraw()
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("res://verification/drag_%d.png" % id)
-	for id in [2,10,11,15,19,21,23,24,25,26,27,28,29]:
+	for id in [2,7,107,9,109,10,11,15,17,18,19,21,23,24,25,26,27,28,29,30]:
 		start_round(id)
 		remaining = 4.0
 		for p in pieces:

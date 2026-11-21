@@ -20,6 +20,10 @@ Version **1.6.0** adds three puzzles from the November Downloads archives, avail
 
 The 15 original PNGs are preserved in `assets/new/`. Layout and validation details are in the [November level notes](docs/november-levels.md).
 
+Version **1.6.2** completes the November feedback: **Eight switches (7b)** matches the two-row reference, **Tool sizes (9b)** adds six progressively larger wrenches, **Grocery shelf (17)** replaces parquet using the new pack, and **Pills (18)** uses the corrected background. See [November feedback](docs/november-feedback.md) for sources and gameplay.
+
+Version **1.7.0** adds **Bedtime (30)** from the supplied bedroom artwork: tap crooked pillows, rumpled covers, or lit bedside lamps to tidy the scene. Available in random play and Choose Level. See [level 30 notes](docs/level-30.md).
+
 Fix each scene within five seconds. Tap puzzles use a click or tap; books, pencils, paint tubes, juice bottles, knife shapes, and the garden use dragging with a mouse or one finger. Success and timeout both advance automatically. The main menu's **Choose Level** starts repeating practice rounds. Use **II**, Escape, or Android Back to pause; tap below the pause text to return to the menu. Best streak is saved locally. Touch and mouse use the same logical coordinates; portrait artwork is preserved with letterboxing.
 
 - **Hexagons (19):** blue petals surround red centers in a full-screen flower pattern, with cream tiles between flowers. A red center and a cream tile start exchanged. Tap either misplaced tile to restore the pair. Correct tiles stay unchanged.
@@ -37,7 +41,7 @@ Fix each scene within five seconds. Tap puzzles use a click or tap; books, penci
 
 All game inscriptions use the bundled Cooper Bold (`assets/fonts/COOPERB.TTF`), extracted from `Corel/COOPERB.zip`. Text has no outlines. The Play label and elevator numerals are drawn with this font instead of using the lettering baked into the original sprites.
 
-There are 31 playable variants. The eight original variants remain: fireplace, tower windows, drawer handles, building windows, ribbon tiles, circle tiles, road manhole, and pills. The additional puzzles use the supplied artwork: elevator buttons (2), plates (3), garden (5), junction cover (6), switches (7), tools (9), pencils (10), cakes (11), ceramics (12), brick arch (15), parquet (17), hexagons (19), cookies (20 and 20b), bathroom tiles (21), bookshelf (22), paint tubes (23), juice bottles (24), drawers (25), and dessert picture (26). Original level numbers are preserved; the previously unnumbered dessert picture is assigned 26. The circle and cookie-shift variants use internal IDs 114 and 120. Plate-size ordering (103) has been removed.
+There are 34 playable variants. The eight original variants remain: fireplace, tower windows, drawer handles, building windows, ribbon tiles, circle tiles, road manhole, and pills. The additional puzzles use the supplied artwork: elevator buttons (2), plates (3), garden (5), junction cover (6), switches (7), tools (9), pencils (10), cakes (11), ceramics (12), brick arch (15), grocery shelf (17), hexagons (19), cookies (20 and 20b), bathroom tiles (21), bookshelf (22), paint tubes (23), juice bottles (24), drawers (25), and dessert picture (26). Original level numbers are preserved; the previously unnumbered dessert picture is assigned 26. The eight-switch, tool-size, circle, and cookie-shift variants use internal IDs 107, 109, 114, and 120. Plate-size ordering (103) has been removed.
 
 The September art packs add four puzzles, available in both random play and the level picker:
 

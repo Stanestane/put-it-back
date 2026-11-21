@@ -5,7 +5,7 @@ const November = preload("res://scripts/november_levels.gd")
 ## Additional scenes composed from the supplied PNG exports.
 static func build(g, id: int) -> void:
 	match id:
-		27,28,29:
+		17,27,28,29,30:
 			November.build(g,id)
 			return
 		2:
@@ -33,16 +33,32 @@ static func build(g, id: int) -> void:
 			g.prompt = "JOIN THE LINES!"
 			var p = g.add_piece("Manhole_Level6",Vector2(1250,2500),Vector2(1200,1200),"rotate")
 			p.step = 90.0
-		7:
+		7,107:
 			g.prompt = "SWITCH UP!"
-			for i in 3:
-				g.add_piece("Switch_Frame_Level7",Vector2(650+i*600,2500),Vector2(490,936))
-				g.add_piece("Switch_Lever_Level7",Vector2(650+i*600,2440),Vector2(240,80),"move")
+			g.background = "Background_Level7"
+			var rows = 2 if id == 107 else 1
+			var columns = 4 if id == 107 else 3
+			for row in rows:
+				var y = 2500 + (row-(rows-1)/2.0)*1036
+				for i in columns:
+					var x = 1250 + (i-(columns-1)/2.0)*(490 if id == 107 else 600)
+					g.add_piece("Switch_Frame_Level7",Vector2(x,y),Vector2(490,936))
+					g.add_piece("Switch_Lever_Level7",Vector2(x,y-60),Vector2(240,80),"move")
 		9:
 			g.prompt = "HANG STRAIGHT!"
 			for i in 3:
 				g.add_piece("Hanger_Level9",Vector2(650+i*600,950),Vector2(114,114))
 				var p = g.art("Wrench_Level9",467+i*600,790,366,1940,"rotate")
+				p.step = 6.0
+		109:
+			g.background = "Background_Level9"
+			g.prompt = "HANG STRAIGHT!"
+			# Six progressively larger tools share the mounting rail in Ana's reference.
+			for i in 6:
+				var factor = (1300+i*120)/1940.0
+				var x = 340+i*350
+				g.add_piece("Hanger_Level9",Vector2(x,950),Vector2(114,114)*factor)
+				var p = g.art("Wrench_Level9",x-183*factor,950-160*factor,366*factor,1940*factor,"rotate")
 				p.step = 6.0
 		10:
 			g.prompt = "DRAG INTO COLOR ORDER!"
@@ -67,16 +83,6 @@ static func build(g, id: int) -> void:
 		15:
 			References.build_arch(g)
 			return
-		17:
-			g.prompt = "FIT THE PARQUET!"
-			for r in 5:
-				for c in 3:
-					var x = 50+c*800
-					var y = 500+r*800
-					if (r+c)%2 == 0:
-						for j in 2: g.art("Tile1_Level17",x+j*400,y,400,800,"move")
-					else:
-						for j in 2: g.art("Tile2_Level17",x,y+j*400,800,400,"move")
 		19:
 			References.build_flowers(g)
 			return
@@ -155,9 +161,6 @@ static func build(g, id: int) -> void:
 	# Tight repeated layouts move vertically to keep every hit target accessible.
 	for p in g.pieces:
 		if p.faults == 0: continue
-		if id == 17:
-			p.target = p.home + Vector2(0,-minf(40,p.size.y*0.08))
-			p.pos = p.target
-		elif id == 7:
+		if id in [7,107]:
 			p.target = p.home+Vector2(0,170)
 			p.pos = p.target
